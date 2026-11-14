@@ -1,9 +1,9 @@
 // Service worker: makes the app open and work with no internet.
 // Bump VERSION whenever you deploy changes, so phones pick up the update.
-const VERSION = "shopbook-v6";
+const VERSION = "shopbook-v8";
 const SHELL = [
   "./", "index.html", "app.css", "manifest.webmanifest",
-  "js/app.js", "js/db.js", "js/sync.js", "js/parse.js", "js/config.js",
+  "js/app.js", "js/db.js", "js/sync.js", "js/config.js",
   "vendor/supabase.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png",
 ];

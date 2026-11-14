@@ -1,6 +1,6 @@
-# Shop Book
+# Arun Cloth Store
 
-An installable web app (PWA) for running a small shop. It covers customer dues with bill photos, call and WhatsApp reminders, stock with buying, wholesale and retail prices, bills you can speak aloud, and printing. It works on Android, iPhone, and desktop from one codebase. It also works fully offline and backs up to the cloud when the internet comes back.
+An installable web app (PWA) for running a small shop. It covers customer dues with bill photos, call and WhatsApp reminders, stock with buying, wholesale and retail prices, bills, and printing. It works on Android, iPhone, and desktop from one codebase. It also works fully offline and backs up to the cloud when the internet comes back.
 
 No build step: these are plain static files.
 
@@ -59,17 +59,11 @@ Bill **photos** live in Supabase Storage and are not part of the SQL dump. They'
 
 - **Dues:** take a photo of a bill or add one by hand, and the customer is created automatically. *Got payment / history* records a payment and shows every entry with its photos.
 - **Stock:** enter buying, wholesale and retail prices to see profit per unit and margin. Stock goes down automatically when a bill is saved, and comes back if the bill is cancelled.
-- **New bill:** tap the mic and speak, for example:
-  *"Ramesh 98400 12345 from Tambaram, rice 5 kg at 60, sugar 2 kg at 45, oil 1 litre for 160, paid 200, done."*
-  - "at / into / x / each" means price per unit; "for / total" means price for that whole line.
-  - If no price is said, the retail price from Stock is used.
-  - If the mic isn't available, type the same sentence instead.
-  - Any amount left unpaid goes to that customer's dues.
+- **New bill:** enter the customer, add each item with quantity and rate, and tap Save bill. Picking a product from Stock fills in its retail price. Any amount left unpaid goes to that customer's dues.
 - **Printing:** in Settings, choose a normal printer (A5) or a 58 mm thermal printer. On Android, most Bluetooth thermal printers work through their maker's print-service app or a "RawBT"-style driver, which then shows up in the normal print dialog.
 
 ## Known limits
 
-- **Voice input** uses the browser's speech recognition. It works well in Chrome on Android and desktop. On iPhone, support depends on the iOS version, so typing is the reliable fallback. Speech is recognised by Google/Apple servers, so voice entry needs internet; everything else works offline.
 - **Bill photos aren't read automatically yet.** The photo is stored with the due entry, and the amount is typed in. Automatic reading can be added later with a Supabase Edge Function calling an OCR or vision API.
 - **Stock quantities** use last-write-wins. If two phones sell the same item while both are offline, one decrement can be lost. Money is not affected, because dues use the ledger.
 - **Bill numbers** (`YYMMDD-n`) are per device. Two phones billing offline on the same day can repeat a number. Records stay separate because each has its own ID.
@@ -82,7 +76,6 @@ app.css                styles (light + dark)
 js/app.js              screens and business logic
 js/db.js               on-device database + upload queue
 js/sync.js             Supabase sync (push, pull, photos)
-js/parse.js            speech/typed bill → items
 js/config.js           your Supabase URL + key
 sw.js                  offline support and updates
 manifest.webmanifest   install info and icons

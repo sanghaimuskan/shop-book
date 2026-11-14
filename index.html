@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Shop Book</title>
+<title>Arun Cloth Store</title>
 <meta name="theme-color" content="#1F3A93">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Shop Book">
+<meta name="apple-mobile-web-app-title" content="Arun Cloth Store">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -21,7 +21,7 @@
 <!-- ============ SIGN IN ============ -->
 <div class="login" id="login" hidden>
   <div class="card">
-    <h1>Shop Book</h1>
+    <h1>Arun Cloth Store</h1>
     <p id="loginIntro">Sign in to keep your shop records safe in the cloud.</p>
     <div id="stepEmail">
       <label>Email<input id="loginEmail" type="email" autocomplete="username" inputmode="email"></label>
@@ -42,7 +42,7 @@
     <button class="tab" role="tab" data-v="stock" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Stock</button>
     <button class="tab" role="tab" data-v="newbill" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>New bill</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z"/><path d="M12 8v8M8 12h8"/></svg>New bill</button>
     <button class="tab" role="tab" data-v="bills" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Bills</button>
     <button class="tab" role="tab" data-v="staff" aria-selected="false">
@@ -54,7 +54,7 @@
   <main>
     <div class="top">
       <div>
-        <p class="shopname" id="shopTitle">My Shop</p>
+        <p class="shopname" id="shopTitle">Arun Cloth Store</p>
         <button class="shopsub sync" id="sync" style="border:0;background:none;padding:0;cursor:pointer;text-align:left"><span class="dot off"></span>Starting…</button>
       </div>
       <button class="iconbtn" id="openSettings" aria-label="Shop details and backup">
@@ -112,30 +112,6 @@
 
     <!-- NEW BILL -->
     <section class="view" id="v-newbill">
-      <div class="card">
-        <div class="voice">
-          <button class="mic" id="mic" aria-label="Speak the bill">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
-          </button>
-          <div class="say">
-            <b id="micLabel">Tap and speak the bill</b>
-            <span class="hint">Say the name, phone, “from” place, then each item with quantity and price. Bill fills in as you speak. Say “done” at the end.</span>
-          </div>
-          <select id="lang" aria-label="Speaking language" style="width:auto">
-            <option value="en-IN">English</option>
-            <option value="hi-IN">हिन्दी</option>
-            <option value="ta-IN">தமிழ்</option>
-          </select>
-        </div>
-        <label>What was said (you can also type here)
-          <textarea id="spoken" placeholder="Ramesh 98400 12345 from Tambaram. Rice 5 kg at 60, sugar 2 kg at 45, oil 1 litre for 160. Paid 200. Done."></textarea>
-        </label>
-        <div class="actions" style="margin-top:10px">
-          <button class="btn blue" id="fillBill">Fill the bill from this</button>
-        </div>
-        <p class="status" id="billStatus" role="status"></p>
-      </div>
-
       <div class="card">
         <div class="grid three">
           <label>Customer name<input id="bName" list="custNames" autocomplete="off"></label>

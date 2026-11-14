@@ -1,4 +1,4 @@
--- Shop Book: Supabase schema
+-- Arun Cloth Store: Supabase schema
 -- Run this once in Supabase → SQL Editor → New query → Run.
 --
 -- Design notes

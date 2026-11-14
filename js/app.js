@@ -1,6 +1,5 @@
 import * as db from "./db.js";
 import { sb, configured, sync, syncSoon, startAutoSync, onStatus, state as syncState, photoUrl, refreshPending } from "./sync.js";
-import { parseBill } from "./parse.js";
 
 /* ================= helpers ================= */
 const $ = s => document.querySelector(s);
@@ -175,7 +174,7 @@ window.addEventListener("hashchange", () => { const v = location.hash.slice(1); 
 
 /* ================= render ================= */
 function render() {
-  $("#shopTitle").textContent = shop().name || "My Shop";
+  $("#shopTitle").textContent = shop().name || "Arun Cloth Store";
   renderDues(); renderProds(); renderBills(); buildAtt(); renderStaff(); renderReminders();
   $("#catNames").innerHTML = categories().map(c => `<option value="${esc(c)}">`).join("");
   $("#prodNames").innerHTML = live("products").map(p => `<option value="${esc(p.name)}">`).join("");
@@ -478,83 +477,11 @@ $("#bName").addEventListener("change", () => {
 });
 $("#addRow").addEventListener("click", () => addRow().querySelector(".n").focus());
 function clearBill() {
-  ["#bName", "#bPhone", "#bPlace", "#bPaid", "#spoken"].forEach(s => $(s).value = "");
-  $("#itemRows").innerHTML = ""; addRow(); $("#billStatus").textContent = ""; calc();
+  ["#bName", "#bPhone", "#bPlace", "#bPaid"].forEach(s => $(s).value = "");
+  $("#itemRows").innerHTML = ""; addRow(); calc();
 }
 $("#clearBill").addEventListener("click", () => { if (!readItems().length || confirm("Clear this bill?")) clearBill(); });
 addRow();
-
-// voice
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false, fillOnEnd = false, base = "", segs = [], liveT = null, quietCount = 0;
-const DONE_RE = /(?:\b(?:done|that's it|thats it|bas|ho gaya)|हो गया|बस|முடிந்தது|போதும்)\s*[.!]?\s*$/i;
-function stopListening(autoFill) {
-  listening = false; fillOnEnd = !!autoFill; clearTimeout(liveT);
-  $("#mic").classList.remove("live"); $("#micLabel").textContent = "Tap and speak the bill";
-  // the browser sends the last words just before it ends, so fill from onend
-  try { rec && rec.stop(); } catch { if (autoFill) { fillOnEnd = false; if ($("#spoken").value.trim()) fillFromText(); } }
-}
-$("#mic").addEventListener("click", () => {
-  const st = $("#billStatus");
-  if (!SR) { st.className = "status err"; st.textContent = "Speaking isn't supported in this browser. Type the bill in the box — the same words work."; $("#spoken").focus(); return; }
-  if (listening) { stopListening(true); return; }
-  rec = new SR(); rec.lang = $("#lang").value; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
-  base = $("#spoken").value.trim(); base = base ? base + " " : ""; segs = []; quietCount = 0;
-  rec.onresult = ev => {
-    let interim = "";
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const r = ev.results[i], tx = r[0].transcript.trim();
-      if (!tx) continue;
-      if (r.isFinal) {
-        const last = segs[segs.length - 1];                       // some phones repeat or extend the last phrase
-        if (last === tx) continue;
-        if (last && tx.startsWith(last)) segs[segs.length - 1] = tx; else segs.push(tx);
-      } else interim += (interim ? " " : "") + tx;
-    }
-    quietCount = 0;
-    const done = base + segs.join(" ");
-    $("#spoken").value = (done + (interim ? " " + interim : "")).trim();
-    clearTimeout(liveT);
-    liveT = setTimeout(() => fillFromText({ text: done, live: true }), 500);   // the bill fills in while speaking
-    if (DONE_RE.test(segs.join(" ").trim())) stopListening(true);
-  };
-  rec.onerror = ev => {
-    if (ev.error === "no-speech" && ++quietCount < 4) return;    // just silence: keep listening
-    if (ev.error === "aborted") return;
-    st.className = "status err";
-    st.textContent = ev.error === "not-allowed" || ev.error === "service-not-allowed"
-      ? "Microphone permission is off. Allow it in the browser settings, or type the bill instead."
-      : ev.error === "network" ? "Voice needs internet on this phone. Type the bill instead."
-      : ev.error === "no-speech" ? "Didn't hear anything. Tap the mic and try again." : "Didn't catch that. Tap the mic and try again.";
-    stopListening(false);
-  };
-  rec.onend = () => {
-    if (listening) { setTimeout(() => { if (listening) { try { rec.start(); } catch { stopListening(true); } } }, 150); return; }
-    if (fillOnEnd) { fillOnEnd = false; if ($("#spoken").value.trim()) fillFromText(); }
-  };
-  try { rec.start(); listening = true; $("#mic").classList.add("live"); $("#micLabel").textContent = "Listening… say “done” when finished"; st.className = "status"; st.textContent = ""; }
-  catch { st.className = "status err"; st.textContent = "Couldn't start the microphone. Type the bill instead."; }
-});
-$("#fillBill").addEventListener("click", () => fillFromText());
-function fillFromText(opts = {}) {
-  const text = (opts.text ?? $("#spoken").value).trim(), st = $("#billStatus");
-  if (!text) { if (!opts.live) { st.className = "status err"; st.textContent = "Speak or type the bill first."; } return; }
-  const r = parseBill(text, live("products"), live("customers"), { lang: $("#lang").value });
-  const c = r.customer;
-  if (c.name) $("#bName").value = c.name;
-  if (c.phone) $("#bPhone").value = c.phone;
-  if (c.place) $("#bPlace").value = c.place;
-  if (c.name) $("#bName").dispatchEvent(new Event("change"));      // fills phone / place of a saved customer
-  if (r.items.length) { $("#itemRows").innerHTML = ""; r.items.forEach(i => addRow({ name: i.name, qty: i.qty, rate: i.rate })); }
-  const total = calc();
-  if (r.paidFull) $("#bPaid").value = total; else if (r.paid != null) $("#bPaid").value = r.paid;
-  calc();
-  const noRate = [...$("#itemRows").children].filter(tr => tr.querySelector(".n").value.trim() && !num(tr.querySelector(".r").value));
-  noRate.forEach(tr => tr.querySelector(".r").classList.add("warn"));
-  st.className = r.items.length ? "status" : "status err";
-  st.textContent = !r.items.length ? (opts.live ? "Listening…" : "Couldn't find items. Say each one like “rice 5 kg at 60”.")
-    : `Found ${r.items.length} item${r.items.length === 1 ? "" : "s"}.` + (noRate.length ? ` ${noRate.length} need${noRate.length === 1 ? "s" : ""} a rate (marked red).` : " Check them, then save.");
-}
 
 function nextBillNo(date) {
   const prefix = date.slice(2).replace(/-/g, "");      // 261111
@@ -602,7 +529,7 @@ $("#savePrint").addEventListener("click", async () => { const id = await saveBil
 function sheetHTML(b) {
   const s = shop(), bal = money(num(b.total) - num(b.paid));
   return `<div class="sheet">
-    <h3>${esc(s.name || "My Shop")}</h3>
+    <h3>${esc(s.name || "Arun Cloth Store")}</h3>
     <p class="sub">${esc([s.address, s.phone ? "Ph: " + s.phone : "", s.gstin ? "GSTIN: " + s.gstin : ""].filter(Boolean).join(" | "))}</p>
     <div class="meta"><span>Bill no. <span class="hw">${esc(b.no)}</span></span><span>Date <span class="hw">${esc(fmtDate(b.bill_date))}</span></span></div>
     <div class="meta"><span>To <span class="hw">${esc(b.customer_name || "Cash customer")}</span>${b.place ? `, <span class="hw">${esc(b.place)}</span>` : ""}</span>${b.phone ? `<span class="hw">${esc(b.phone)}</span>` : ""}</div>
@@ -615,7 +542,7 @@ function sheetHTML(b) {
 }
 function billText(b) {
   const s = shop(), bal = money(num(b.total) - num(b.paid));
-  return `*${s.name || "My Shop"}*\nBill ${b.no}, ${fmtDate(b.bill_date)}\n${b.customer_name ? "To: " + b.customer_name + "\n" : ""}\n` +
+  return `*${s.name || "Arun Cloth Store"}*\nBill ${b.no}, ${fmtDate(b.bill_date)}\n${b.customer_name ? "To: " + b.customer_name + "\n" : ""}\n` +
     b.items.map(i => `${i.name}: ${money(i.qty)} x ${rupee(i.rate)} = ${rupee(i.amount)}`).join("\n") +
     `\n\n*Total: ${rupee(b.total)}*` + (num(b.paid) ? `\nPaid: ${rupee(b.paid)}` : "") + (bal > 0 ? `\nBalance: ${rupee(bal)}` : "");
 }
@@ -884,7 +811,7 @@ async function exportJson() {
   const tables = {};
   for (const t of db.TABLES) tables[t] = await db.getAll(t);     // includes removed rows, so nothing is lost
   const data = { app: "shop-book", version: 1, exported_at: new Date().toISOString(), tables };
-  const ok = await deliverFile(new Blob([JSON.stringify(data)], { type: "application/json" }), `shop-book-backup-${today()}.json`);
+  const ok = await deliverFile(new Blob([JSON.stringify(data)], { type: "application/json" }), `arun-cloth-store-backup-${today()}.json`);
   if (ok) { await db.metaSet("lastBackup", Date.now()); checkBackupReminder(); toast("Backup saved"); }
 }
 $("#exportJson").addEventListener("click", exportJson);
@@ -902,7 +829,7 @@ $("#importJson").addEventListener("change", async e => {
   const st = $("#backupStatus");
   try {
     const data = JSON.parse(await f.text());
-    if (data.app !== "shop-book" || !data.tables) throw new Error("not a Shop Book backup");
+    if (data.app !== "shop-book" || !data.tables) throw new Error("not an Arun Cloth Store backup");
     if (!confirm(`Restore from the backup made ${fmtDate(String(data.exported_at).slice(0, 10))}? Anything missing here will be brought back. Newer changes are kept.`)) return;
     let n = 0;
     for (const t of db.TABLES) if (Array.isArray(data.tables[t])) {
@@ -912,7 +839,7 @@ $("#importJson").addEventListener("change", async e => {
     await loadAll(); refreshPending(); if (!LOCAL_ONLY) syncSoon();
     st.className = "status"; st.textContent = n ? `Restored ${n} record${n === 1 ? "" : "s"}.` : "Nothing to restore. Everything in the backup is already here.";
   } catch (err) {
-    st.className = "status err"; st.textContent = "That file isn't a Shop Book backup.";
+    st.className = "status err"; st.textContent = "That file isn't an Arun Cloth Store backup.";
   }
 });
 async function checkBackupReminder() {

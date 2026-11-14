@@ -1,6 +1,6 @@
 {
-  "name": "Shop Book",
-  "short_name": "Shop Book",
+  "name": "Arun Cloth Store",
+  "short_name": "Arun Cloth Store",
   "description": "Dues, stock prices and bills for the shop.",
   "start_url": "./#dues",
   "scope": "./",
