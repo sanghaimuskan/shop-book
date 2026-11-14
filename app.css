@@ -200,7 +200,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .items input{padding:9px 8px}
 .x{width:30px}
 
-.req{color:var(--red);font-weight:700}
+.req{color:var(--red);font-weight:800;font-size:1.1em;line-height:1}
 
 /* stock */
 .stock{min-width:78px;text-align:center;border-radius:var(--radius-sm);padding:6px 10px;background:var(--surface-2);border:1px solid var(--line)}

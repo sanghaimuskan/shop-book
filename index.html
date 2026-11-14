@@ -220,10 +220,10 @@
     <header><h2>Add due</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
     <img class="photo" id="duePreview" alt="Bill photo" hidden>
     <div class="grid two">
-      <label>Customer name <span class="req" aria-hidden="true">*</span><input id="dName" list="custNames" required></label>
+      <label><span>Customer name <span class="req" aria-hidden="true">*</span></span><input id="dName" list="custNames" required></label>
       <label>Phone<input id="dPhone" inputmode="tel"></label>
       <label>Place<input id="dPlace"></label>
-      <label>Amount due ₹ <span class="req" aria-hidden="true">*</span><input id="dAmt" inputmode="decimal" required></label>
+      <label><span>Amount due ₹ <span class="req" aria-hidden="true">*</span></span><input id="dAmt" inputmode="decimal" required></label>
       <label>Bill date<input id="dDate" type="date"></label>
       <label>Note<input id="dNote" placeholder="What the bill is for"></label>
     </div>
@@ -237,7 +237,7 @@
     <header><h2 id="custTitle">Customer</h2><button class="iconbtn" id="custClose" aria-label="Close">✕</button></header>
     <div id="custHead"></div>
     <div class="card" style="margin:0">
-      <label>Got payment ₹ <span class="req" aria-hidden="true">*</span><input id="payAmt" inputmode="decimal"></label>
+      <label><span>Got payment ₹ <span class="req" aria-hidden="true">*</span></span><input id="payAmt" inputmode="decimal"></label>
       <div class="actions" style="margin-top:10px"><button class="btn primary" id="paySave">Save payment</button></div>
     </div>
     <p class="section-h">History</p>
@@ -245,7 +245,7 @@
     <details>
       <summary class="hint" style="cursor:pointer">Edit customer details</summary>
       <div class="grid two" style="margin-top:10px">
-        <label>Name <span class="req" aria-hidden="true">*</span><input id="cName"></label>
+        <label><span>Name <span class="req" aria-hidden="true">*</span></span><input id="cName"></label>
         <label>Phone<input id="cPhone" inputmode="tel"></label>
         <label>Place<input id="cPlace"></label>
         <label>Note<input id="cNote"></label>
@@ -262,7 +262,7 @@
 <dialog id="prodDlg">
   <form class="dlg" method="dialog" novalidate>
     <header><h2 id="prodDlgTitle">Add product</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
-    <label>Product name <span class="req" aria-hidden="true">*</span><input id="pName" required></label>
+    <label><span>Product name <span class="req" aria-hidden="true">*</span></span><input id="pName" required></label>
     <div class="grid three">
       <label>We bought at ₹<input id="pCost" inputmode="decimal"></label>
       <label>Wholesale ₹<input id="pWhole" inputmode="decimal"></label>
@@ -328,7 +328,7 @@
 <dialog id="empDlg">
   <form class="dlg" method="dialog" novalidate>
     <header><h2 id="empTitle">Add staff</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
-    <label>Name <span class="req" aria-hidden="true">*</span><input id="eName" required autocomplete="off"></label>
+    <label><span>Name <span class="req" aria-hidden="true">*</span></span><input id="eName" required autocomplete="off"></label>
     <div class="grid two">
       <label>Phone<input id="ePhone" inputmode="tel"></label>
       <label>Work / role<input id="eRole" placeholder="e.g. Helper, Cashier"></label>
@@ -355,10 +355,10 @@
 <dialog id="remDlg">
   <form class="dlg" method="dialog" novalidate>
     <header><h2 id="remTitleH">Add payment</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
-    <label>What to pay <span class="req" aria-hidden="true">*</span><input id="rTitle" list="remTitles" required autocomplete="off" placeholder="e.g. Shop rent"></label>
+    <label><span>What to pay <span class="req" aria-hidden="true">*</span></span><input id="rTitle" list="remTitles" required autocomplete="off" placeholder="e.g. Shop rent"></label>
     <div class="grid two">
       <label>Amount ₹<input id="rAmt" inputmode="decimal" placeholder="Optional"></label>
-      <label>Due date <span class="req" aria-hidden="true">*</span><input id="rDate" type="date" required></label>
+      <label><span>Due date <span class="req" aria-hidden="true">*</span></span><input id="rDate" type="date" required></label>
     </div>
     <label>Repeats
       <select id="rRepeat"><option value="none">One time</option><option value="monthly">Every month</option><option value="weekly">Every week</option><option value="yearly">Every year</option></select>
