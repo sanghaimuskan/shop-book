@@ -45,6 +45,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>New bill</button>
     <button class="tab" role="tab" data-v="bills" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Bills</button>
+    <button class="tab" role="tab" data-v="staff" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14a4.5 4.5 0 014 4"/></svg>Staff</button>
+    <button class="tab" role="tab" data-v="payments" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21h4"/></svg>Payments<span class="badge" id="payBadge" hidden></span></button>
   </nav>
 
   <main>
@@ -65,6 +69,11 @@
     <div class="banner warn" id="backupBanner" hidden>
       <span id="backupBannerText">You haven't downloaded a backup this week.</span>
       <button class="btn small" id="backupNow">Download backup</button>
+    </div>
+
+    <div class="banner warn" id="payBanner" hidden>
+      <span id="payBannerText"></span>
+      <button class="btn small" id="payBannerGo">View</button>
     </div>
 
     <!-- DUES -->
@@ -97,6 +106,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add product</button>
       </div>
       <input class="search" id="prodSearch" type="search" placeholder="Search products">
+      <div class="chips" id="catChips" hidden></div>
       <div class="list" id="prodList"></div>
     </section>
 
@@ -109,7 +119,7 @@
           </button>
           <div class="say">
             <b id="micLabel">Tap and speak the bill</b>
-            <span class="hint">Say the name, phone, “from” place, then each item with quantity and price. Say “done” at the end.</span>
+            <span class="hint">Say the name, phone, “from” place, then each item with quantity and price. Bill fills in as you speak. Say “done” at the end.</span>
           </div>
           <select id="lang" aria-label="Speaking language" style="width:auto">
             <option value="en-IN">English</option>
@@ -137,7 +147,7 @@
       <div class="card">
         <div class="tablewrap">
           <table class="items">
-            <thead><tr><th>Item</th><th>Qty</th><th>Rate ₹</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+            <thead><tr><th>Item <span class="req" aria-hidden="true">*</span></th><th>Qty</th><th>Rate ₹</th><th style="text-align:right">Amount</th><th></th></tr></thead>
             <tbody id="itemRows"></tbody>
           </table>
         </div>
@@ -163,22 +173,57 @@
       <input class="search" id="billSearch" type="search" placeholder="Search bills by name, phone or number">
       <div class="list" id="billList"></div>
     </section>
+
+    <!-- STAFF -->
+    <section class="view" id="v-staff">
+      <div class="datebar">
+        <button class="iconbtn" id="attPrev" aria-label="Previous day">‹</button>
+        <div><input type="date" id="attDate" aria-label="Attendance date"><div class="hint" id="attDay"></div></div>
+        <button class="iconbtn" id="attNext" aria-label="Next day">›</button>
+      </div>
+      <div class="attsum" id="attSum"></div>
+      <div class="actions" style="margin-bottom:12px">
+        <button class="btn primary" id="allPresent">Everyone present</button>
+        <button class="btn" id="addEmp">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add staff</button>
+      </div>
+      <div class="list" id="empList"></div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section class="view" id="v-payments">
+      <div class="ledger">
+        <div>
+          <div class="lbl">To pay in the next 7 days</div>
+          <div class="amt" id="payTotal">₹0</div>
+          <div class="lbl" id="payCount">Nothing coming up</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="addRem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add payment</button>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="showPaid"> Show payments already done</label>
+      <div class="list" id="remList"></div>
+    </section>
   </main>
 </div>
 
 <datalist id="prodNames"></datalist>
 <datalist id="custNames"></datalist>
+<datalist id="catNames"></datalist>
+<datalist id="remTitles"><option value="Shop rent"><option value="Electricity bill"><option value="Supplier payment"><option value="GST"><option value="Loan EMI"><option value="Insurance"><option value="Water bill"><option value="Internet / phone"></datalist>
 
 <!-- due dialog -->
 <dialog id="dueDlg">
-  <form class="dlg" method="dialog">
-    <header><h2>Add due</h2><button class="iconbtn" value="cancel" aria-label="Close">✕</button></header>
+  <form class="dlg" method="dialog" novalidate>
+    <header><h2>Add due</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
     <img class="photo" id="duePreview" alt="Bill photo" hidden>
     <div class="grid two">
-      <label>Customer name<input id="dName" list="custNames" required></label>
+      <label>Customer name <span class="req" aria-hidden="true">*</span><input id="dName" list="custNames" required></label>
       <label>Phone<input id="dPhone" inputmode="tel"></label>
       <label>Place<input id="dPlace"></label>
-      <label>Amount due ₹<input id="dAmt" inputmode="decimal" required></label>
+      <label>Amount due ₹ <span class="req" aria-hidden="true">*</span><input id="dAmt" inputmode="decimal" required></label>
       <label>Bill date<input id="dDate" type="date"></label>
       <label>Note<input id="dNote" placeholder="What the bill is for"></label>
     </div>
@@ -192,7 +237,7 @@
     <header><h2 id="custTitle">Customer</h2><button class="iconbtn" id="custClose" aria-label="Close">✕</button></header>
     <div id="custHead"></div>
     <div class="card" style="margin:0">
-      <label>Got payment ₹<input id="payAmt" inputmode="decimal"></label>
+      <label>Got payment ₹ <span class="req" aria-hidden="true">*</span><input id="payAmt" inputmode="decimal"></label>
       <div class="actions" style="margin-top:10px"><button class="btn primary" id="paySave">Save payment</button></div>
     </div>
     <p class="section-h">History</p>
@@ -200,7 +245,7 @@
     <details>
       <summary class="hint" style="cursor:pointer">Edit customer details</summary>
       <div class="grid two" style="margin-top:10px">
-        <label>Name<input id="cName"></label>
+        <label>Name <span class="req" aria-hidden="true">*</span><input id="cName"></label>
         <label>Phone<input id="cPhone" inputmode="tel"></label>
         <label>Place<input id="cPlace"></label>
         <label>Note<input id="cNote"></label>
@@ -215,17 +260,18 @@
 
 <!-- product dialog -->
 <dialog id="prodDlg">
-  <form class="dlg" method="dialog">
-    <header><h2 id="prodDlgTitle">Add product</h2><button class="iconbtn" value="cancel" aria-label="Close">✕</button></header>
-    <label>Product name<input id="pName" required></label>
+  <form class="dlg" method="dialog" novalidate>
+    <header><h2 id="prodDlgTitle">Add product</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
+    <label>Product name <span class="req" aria-hidden="true">*</span><input id="pName" required></label>
     <div class="grid three">
       <label>We bought at ₹<input id="pCost" inputmode="decimal"></label>
       <label>Wholesale ₹<input id="pWhole" inputmode="decimal"></label>
       <label>Retail ₹<input id="pRetail" inputmode="decimal"></label>
     </div>
+    <label>Category<input id="pCat" list="catNames" placeholder="e.g. Grocery, Oil, Soap" autocomplete="off"></label>
     <div class="grid two">
       <label>Unit<input id="pUnit" placeholder="kg, piece, box"></label>
-      <label>In stock<input id="pQty" inputmode="decimal"></label>
+      <label>Quantity in stock<input id="pQty" inputmode="decimal" placeholder="How many do you have now"></label>
     </div>
     <footer>
       <button class="btn danger ghost" type="button" id="prodDelete" hidden>Remove</button>
@@ -276,6 +322,53 @@
     <p class="hint" id="acctInfo" style="margin:0"></p>
     <div class="actions"><button class="btn ghost" id="syncNow">Sync now</button><button class="btn danger ghost" id="signOut">Sign out</button></div>
   </div>
+</dialog>
+
+<!-- staff dialog: details + monthly attendance -->
+<dialog id="empDlg">
+  <form class="dlg" method="dialog" novalidate>
+    <header><h2 id="empTitle">Add staff</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
+    <label>Name <span class="req" aria-hidden="true">*</span><input id="eName" required autocomplete="off"></label>
+    <div class="grid two">
+      <label>Phone<input id="ePhone" inputmode="tel"></label>
+      <label>Work / role<input id="eRole" placeholder="e.g. Helper, Cashier"></label>
+      <label>Pay ₹ (optional)<input id="eWage" inputmode="decimal" placeholder="Leave empty if not needed"></label>
+      <label>Pay is<select id="eWageType"><option value="day">per day</option><option value="month">per month</option></select></label>
+    </div>
+    <label>Note<input id="eNote"></label>
+    <div id="empMonthBox" hidden>
+      <p class="section-h">Attendance</p>
+      <div class="monthbar"><button type="button" class="iconbtn" id="empPrevM" aria-label="Previous month">‹</button><b id="empMonthLbl"></b><button type="button" class="iconbtn" id="empNextM" aria-label="Next month">›</button></div>
+      <div class="attsum" id="empMonthSum"></div>
+      <div class="cal" id="empCal"></div>
+      <p class="hint">Tap a day to change it: Present, Half day, Absent, then clear.</p>
+      <p class="hint" id="empPay" style="font-weight:600;color:var(--ink)"></p>
+    </div>
+    <footer>
+      <button class="btn danger ghost" type="button" id="empDelete" hidden>Remove</button>
+      <button class="btn primary" type="button" id="empSave">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- payment reminder dialog -->
+<dialog id="remDlg">
+  <form class="dlg" method="dialog" novalidate>
+    <header><h2 id="remTitleH">Add payment</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
+    <label>What to pay <span class="req" aria-hidden="true">*</span><input id="rTitle" list="remTitles" required autocomplete="off" placeholder="e.g. Shop rent"></label>
+    <div class="grid two">
+      <label>Amount ₹<input id="rAmt" inputmode="decimal" placeholder="Optional"></label>
+      <label>Due date <span class="req" aria-hidden="true">*</span><input id="rDate" type="date" required></label>
+    </div>
+    <label>Repeats
+      <select id="rRepeat"><option value="none">One time</option><option value="monthly">Every month</option><option value="weekly">Every week</option><option value="yearly">Every year</option></select>
+    </label>
+    <label>Note<input id="rNote" placeholder="Who to pay, account, etc."></label>
+    <footer>
+      <button class="btn danger ghost" type="button" id="remDelete" hidden>Remove</button>
+      <button class="btn primary" type="button" id="remSave">Save</button>
+    </footer>
+  </form>
 </dialog>
 
 <div id="printArea"></div>

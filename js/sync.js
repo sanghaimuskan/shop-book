@@ -14,8 +14,11 @@ const BUCKET = "bill-photos";
 const COLUMNS = {
   shops: ["id", "name", "address", "phone", "gstin", "paper", "updated_at", "deleted_at"],
   customers: ["id", "name", "phone", "place", "note", "updated_at", "deleted_at"],
-  products: ["id", "name", "cost", "wholesale", "retail", "unit", "qty", "updated_at", "deleted_at"],
+  products: ["id", "name", "cost", "wholesale", "retail", "unit", "qty", "category", "updated_at", "deleted_at"],
   bills: ["id", "no", "customer_id", "customer_name", "phone", "place", "items", "total", "paid", "bill_date", "updated_at", "deleted_at"],
+  employees: ["id", "name", "phone", "role", "wage", "wage_type", "note", "updated_at", "deleted_at"],
+  attendance: ["id", "employee_id", "att_date", "status", "note", "updated_at", "deleted_at"],
+  reminders: ["id", "title", "amount", "due_date", "repeat", "note", "paid_on", "updated_at", "deleted_at"],
   entries: ["id", "customer_id", "kind", "amount", "bill_id", "note", "photo_path", "entry_date", "updated_at", "deleted_at"],
 };
 const pick = (table, row) => Object.fromEntries(COLUMNS[table].map(c => [c, row[c] === undefined ? null : row[c]]));

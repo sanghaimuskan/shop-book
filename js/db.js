@@ -1,9 +1,9 @@
 // Local database (IndexedDB). Every change is saved here first, then queued
 // in the outbox for the cloud. The app never waits on the network.
 
-export const TABLES = ["shops", "customers", "products", "bills", "entries"];
+export const TABLES = ["shops", "customers", "products", "bills", "entries", "employees", "attendance", "reminders"];
 const DB_NAME = "shopbook";
-const VERSION = 1;
+const VERSION = 2;
 
 let dbPromise;
 function open() {
