@@ -62,10 +62,14 @@ create table if not exists public.products (
   retail      numeric(12,2),
   unit        text,
   qty         numeric(12,3),
+  category    text,
   updated_at  timestamptz not null,
   deleted_at  timestamptz,
   synced_at   timestamptz not null default now()
 );
+
+-- added later: safe to run on an existing database
+alter table public.products add column if not exists category text;
 
 create table if not exists public.bills (
   id            uuid primary key,
@@ -100,11 +104,52 @@ create table if not exists public.entries (
   synced_at    timestamptz not null default now()
 );
 
+-- Staff, daily attendance and payment reminders (added later: safe to run on an existing database)
+create table if not exists public.employees (
+  id          uuid primary key,
+  owner_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  name        text not null,
+  phone       text,
+  role        text,
+  wage        numeric(12,2),                   -- optional
+  wage_type   text default 'day',              -- 'day' or 'month'
+  note        text,
+  updated_at  timestamptz not null,
+  deleted_at  timestamptz,
+  synced_at   timestamptz not null default now()
+);
+
+create table if not exists public.attendance (
+  id           uuid primary key,
+  owner_id     uuid not null default auth.uid() references auth.users on delete cascade,
+  employee_id  uuid not null,
+  att_date     date not null,
+  status       text not null check (status in ('present','half','absent')),
+  note         text,
+  updated_at   timestamptz not null,
+  deleted_at   timestamptz,
+  synced_at    timestamptz not null default now()
+);
+
+create table if not exists public.reminders (
+  id          uuid primary key,
+  owner_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  title       text not null,
+  amount      numeric(12,2),
+  due_date    date not null,
+  repeat      text not null default 'none',    -- none, weekly, monthly, yearly
+  note        text,
+  paid_on     date,
+  updated_at  timestamptz not null,
+  deleted_at  timestamptz,
+  synced_at   timestamptz not null default now()
+);
+
 -- ---------- triggers, indexes, security ----------
 do $$
 declare t text;
 begin
-  foreach t in array array['shops','customers','products','bills','entries'] loop
+  foreach t in array array['shops','customers','products','bills','entries','employees','attendance','reminders'] loop
     execute format('drop trigger if exists %I_bw on public.%I', t, t);
     execute format('create trigger %I_bw before insert or update on public.%I
                     for each row execute function public.sb_before_write()', t, t);

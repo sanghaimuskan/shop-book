@@ -18,7 +18,7 @@ const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
 /* ================= in-memory view of the local DB ================= */
-const S = { shops: {}, customers: {}, products: {}, bills: {}, entries: {} };
+const S = { shops: {}, customers: {}, products: {}, bills: {}, entries: {}, employees: {}, attendance: {}, reminders: {} };
 let UID = null;
 let LOCAL_ONLY = false;
 const live = t => Object.values(S[t]).filter(r => !r.deleted_at);
@@ -162,7 +162,7 @@ setInterval(() => renderStatus(syncState), 60000);
 $("#sync").addEventListener("click", async () => { if (!LOCAL_ONLY) { const n = await sync(); if (n) loadAll(); } });
 
 /* ================= tabs ================= */
-const VIEWS = ["dues", "stock", "newbill", "bills"];
+const VIEWS = ["dues", "stock", "newbill", "bills", "staff", "payments"];
 function show(v) {
   $$(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.v === v)));
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
@@ -176,10 +176,12 @@ window.addEventListener("hashchange", () => { const v = location.hash.slice(1); 
 /* ================= render ================= */
 function render() {
   $("#shopTitle").textContent = shop().name || "My Shop";
-  renderDues(); renderProds(); renderBills();
+  renderDues(); renderProds(); renderBills(); buildAtt(); renderStaff(); renderReminders();
+  $("#catNames").innerHTML = categories().map(c => `<option value="${esc(c)}">`).join("");
   $("#prodNames").innerHTML = live("products").map(p => `<option value="${esc(p.name)}">`).join("");
   $("#custNames").innerHTML = live("customers").map(c => `<option value="${esc(c.name)}">${esc([c.place, c.phone].filter(Boolean).join(", "))}</option>`).join("");
   if ($("#custDlg").open && openCustId) renderCustomer();
+  if ($("#empDlg").open && editingEmp) renderEmpMonth();
 }
 
 function renderDues() {
@@ -211,10 +213,19 @@ function renderDues() {
   }).join("");
 }
 
+let catFilter = "";
+const categories = () => [...new Set(live("products").map(p => (p.category || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 function renderProds() {
   const q = $("#prodSearch").value.trim().toLowerCase();
   const prods = live("products").sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  const shown = prods.filter(p => !q || (p.name || "").toLowerCase().includes(q));
+  const cats = categories();
+  if (catFilter && !cats.includes(catFilter) && catFilter !== "\u0000") catFilter = "";
+  const hasUncat = prods.some(p => !(p.category || "").trim());
+  const chip = (v, label) => `<button class="chip" data-cat="${esc(v)}" aria-pressed="${catFilter === v}">${esc(label)}</button>`;
+  $("#catChips").hidden = !cats.length;
+  $("#catChips").innerHTML = cats.length ? chip("", "All") + cats.map(c => chip(c, c)).join("") + (hasUncat ? chip("\u0000", "No category") : "") : "";
+  const shown = prods.filter(p => (!q || (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)) &&
+    (!catFilter || (catFilter === "\u0000" ? !(p.category || "").trim() : (p.category || "").trim() === catFilter)));
   const list = $("#prodList");
   if (!prods.length) { list.innerHTML = `<div class="empty"><strong>No products yet</strong>Add what you sell with its buying, wholesale and retail price.</div>`; return; }
   if (!shown.length) { list.innerHTML = `<div class="empty"><strong>No match</strong>Try another product name.</div>`; return; }
@@ -223,8 +234,11 @@ function renderProds() {
     const pr = sell => sell && c ? `<div class="p ${sell < c ? "neg" : ""}">${sell < c ? "Loss" : "Profit"} ${rupee(Math.abs(sell - c))} (${Math.round((sell - c) / c * 100)}%)</div>` : "";
     const unit = p.unit ? ` / ${esc(p.unit)}` : "";
     const hasQty = p.qty !== null && p.qty !== undefined && p.qty !== "";
-    return `<div class="row" style="grid-template-columns:1fr auto">
-      <div><div class="name">${esc(p.name)}</div><div class="meta">${hasQty ? `In stock: ${esc(money(p.qty))} ${esc(p.unit || "")}` : esc(p.unit || "")}</div></div>
+    const qn = num(p.qty), stockCls = !hasQty ? "none" : qn <= 0 ? "out" : qn <= 5 ? "low" : "ok";
+    const stock = `<div class="stock ${stockCls}"><div class="k">${!hasQty ? "Stock" : qn <= 0 ? "Out of stock" : qn <= 5 ? "Low stock" : "In stock"}</div><div class="v">${hasQty ? esc(money(p.qty)) : "—"}</div>${hasQty && p.unit ? `<div class="u">${esc(p.unit)}</div>` : ""}</div>`;
+    return `<div class="row" style="grid-template-columns:1fr auto auto">
+      <div><div class="name">${esc(p.name)}</div><div class="meta">${(p.category || "").trim() ? `<span class="tag">${esc(p.category.trim())}</span>` : ""}${hasQty ? "" : "Stock not entered"}</div></div>
+      ${stock}
       <button class="btn small ghost" data-prod="${esc(p.id)}">Edit</button>
       <div class="prices">
         <div class="price"><div class="k">Bought at</div><div class="v">${c ? rupee(c) + unit : "—"}</div></div>
@@ -250,6 +264,7 @@ function renderBills() {
 $("#dueSearch").addEventListener("input", renderDues);
 $("#showSettled").addEventListener("change", renderDues);
 $("#prodSearch").addEventListener("input", renderProds);
+$("#catChips").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (b) { catFilter = b.dataset.cat; renderProds(); } });
 $("#billSearch").addEventListener("input", renderBills);
 
 document.addEventListener("click", e => {
@@ -387,13 +402,16 @@ $("#dueSave").addEventListener("click", async () => {
   $("#dueDlg").close(); dueBlob = null; toast(`${rupee(amt)} added for ${cust.name}`);
 });
 
+// Enter inside a field saves (instead of silently closing the dialog)
+$("#dueDlg form").addEventListener("submit", e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); $("#dueSave").click(); });
+
 /* ================= products ================= */
 let editingProd = null;
 function openProd(p) {
   editingProd = p || null;
   $("#prodDlgTitle").textContent = p ? "Edit product" : "Add product";
   $("#pName").value = p?.name || ""; $("#pCost").value = p?.cost ?? ""; $("#pWhole").value = p?.wholesale ?? "";
-  $("#pRetail").value = p?.retail ?? ""; $("#pUnit").value = p?.unit || ""; $("#pQty").value = p?.qty ?? "";
+  $("#pRetail").value = p?.retail ?? ""; $("#pUnit").value = p?.unit || ""; $("#pQty").value = p?.qty ?? ""; $("#pCat").value = p?.category || "";
   $("#prodDelete").hidden = !p; $("#prodDlg").showModal();
 }
 $("#addProd").addEventListener("click", () => openProd(null));
@@ -402,7 +420,7 @@ $("#prodSave").addEventListener("click", async () => {
   const opt = v => String(v).trim() === "" ? null : money(v);
   await write("products", { ...(editingProd || { id: db.uuid(), deleted_at: null }), name,
     cost: opt($("#pCost").value), wholesale: opt($("#pWhole").value), retail: opt($("#pRetail").value),
-    unit: $("#pUnit").value.trim(), qty: opt($("#pQty").value) });
+    unit: $("#pUnit").value.trim(), category: $("#pCat").value.trim(), qty: opt($("#pQty").value) });
   $("#prodDlg").close(); toast("Product saved");
 });
 $("#prodDelete").addEventListener("click", async () => {
@@ -410,6 +428,7 @@ $("#prodDelete").addEventListener("click", async () => {
   await write("products", { ...editingProd, deleted_at: new Date().toISOString() });
   $("#prodDlg").close(); toast("Product removed");
 });
+$("#prodDlg form").addEventListener("submit", e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); $("#prodSave").click(); });
 const findProduct = name => live("products").find(p => (p.name || "").toLowerCase() === String(name || "").trim().toLowerCase());
 
 /* ================= new bill ================= */
@@ -450,7 +469,7 @@ function calc() {
     : named && paidRaw === "" ? "Fill in Paid now if they paid anything." : "Fully paid.";
   return total;
 }
-$("#itemRows").addEventListener("input", calc);
+$("#itemRows").addEventListener("input", e => { e.target.classList.remove("warn"); calc(); });
 $("#bPaid").addEventListener("input", calc);
 $("#bName").addEventListener("input", calc);
 $("#bName").addEventListener("change", () => {
@@ -467,53 +486,74 @@ addRow();
 
 // voice
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false, finalText = "";
+let rec = null, listening = false, fillOnEnd = false, base = "", segs = [], liveT = null, quietCount = 0;
+const DONE_RE = /(?:\b(?:done|that's it|thats it|bas|ho gaya)|हो गया|बस|முடிந்தது|போதும்)\s*[.!]?\s*$/i;
 function stopListening(autoFill) {
-  listening = false; $("#mic").classList.remove("live"); $("#micLabel").textContent = "Tap and speak the bill";
-  try { rec && rec.stop(); } catch {}
-  if (autoFill && $("#spoken").value.trim()) fillFromText();
+  listening = false; fillOnEnd = !!autoFill; clearTimeout(liveT);
+  $("#mic").classList.remove("live"); $("#micLabel").textContent = "Tap and speak the bill";
+  // the browser sends the last words just before it ends, so fill from onend
+  try { rec && rec.stop(); } catch { if (autoFill) { fillOnEnd = false; if ($("#spoken").value.trim()) fillFromText(); } }
 }
 $("#mic").addEventListener("click", () => {
   const st = $("#billStatus");
   if (!SR) { st.className = "status err"; st.textContent = "Speaking isn't supported in this browser. Type the bill in the box — the same words work."; $("#spoken").focus(); return; }
   if (listening) { stopListening(true); return; }
-  rec = new SR(); rec.lang = $("#lang").value; rec.continuous = true; rec.interimResults = true;
-  finalText = $("#spoken").value ? $("#spoken").value.trim() + " " : "";
+  rec = new SR(); rec.lang = $("#lang").value; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+  base = $("#spoken").value.trim(); base = base ? base + " " : ""; segs = []; quietCount = 0;
   rec.onresult = ev => {
     let interim = "";
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const r = ev.results[i];
-      if (r.isFinal) finalText += r[0].transcript + " "; else interim += r[0].transcript;
+      const r = ev.results[i], tx = r[0].transcript.trim();
+      if (!tx) continue;
+      if (r.isFinal) {
+        const last = segs[segs.length - 1];                       // some phones repeat or extend the last phrase
+        if (last === tx) continue;
+        if (last && tx.startsWith(last)) segs[segs.length - 1] = tx; else segs.push(tx);
+      } else interim += (interim ? " " : "") + tx;
     }
-    $("#spoken").value = (finalText + interim).trim();
-    if (/(done|that's it|bas|ho gaya|हो गया|बस|முடிந்தது|போதும்)\s*[.!]?\s*$/i.test(finalText.trim())) stopListening(true);
+    quietCount = 0;
+    const done = base + segs.join(" ");
+    $("#spoken").value = (done + (interim ? " " + interim : "")).trim();
+    clearTimeout(liveT);
+    liveT = setTimeout(() => fillFromText({ text: done, live: true }), 500);   // the bill fills in while speaking
+    if (DONE_RE.test(segs.join(" ").trim())) stopListening(true);
   };
   rec.onerror = ev => {
+    if (ev.error === "no-speech" && ++quietCount < 4) return;    // just silence: keep listening
+    if (ev.error === "aborted") return;
     st.className = "status err";
     st.textContent = ev.error === "not-allowed" || ev.error === "service-not-allowed"
       ? "Microphone permission is off. Allow it in the browser settings, or type the bill instead."
-      : ev.error === "network" ? "Voice needs internet on this phone. Type the bill instead." : "Didn't catch that. Tap the mic and try again.";
+      : ev.error === "network" ? "Voice needs internet on this phone. Type the bill instead."
+      : ev.error === "no-speech" ? "Didn't hear anything. Tap the mic and try again." : "Didn't catch that. Tap the mic and try again.";
     stopListening(false);
   };
-  rec.onend = () => { if (listening) { try { rec.start(); } catch { stopListening(false); } } };
-  try { rec.start(); listening = true; $("#mic").classList.add("live"); $("#micLabel").textContent = "Listening… say “done” when finished"; st.textContent = ""; }
+  rec.onend = () => {
+    if (listening) { setTimeout(() => { if (listening) { try { rec.start(); } catch { stopListening(true); } } }, 150); return; }
+    if (fillOnEnd) { fillOnEnd = false; if ($("#spoken").value.trim()) fillFromText(); }
+  };
+  try { rec.start(); listening = true; $("#mic").classList.add("live"); $("#micLabel").textContent = "Listening… say “done” when finished"; st.className = "status"; st.textContent = ""; }
   catch { st.className = "status err"; st.textContent = "Couldn't start the microphone. Type the bill instead."; }
 });
-$("#fillBill").addEventListener("click", fillFromText);
-function fillFromText() {
-  const text = $("#spoken").value.trim(), st = $("#billStatus");
-  if (!text) { st.className = "status err"; st.textContent = "Speak or type the bill first."; return; }
-  const r = parseBill(text, live("products"));
+$("#fillBill").addEventListener("click", () => fillFromText());
+function fillFromText(opts = {}) {
+  const text = (opts.text ?? $("#spoken").value).trim(), st = $("#billStatus");
+  if (!text) { if (!opts.live) { st.className = "status err"; st.textContent = "Speak or type the bill first."; } return; }
+  const r = parseBill(text, live("products"), live("customers"), { lang: $("#lang").value });
   const c = r.customer;
   if (c.name) $("#bName").value = c.name;
   if (c.phone) $("#bPhone").value = c.phone;
   if (c.place) $("#bPlace").value = c.place;
-  if (c.name && !c.phone) $("#bName").dispatchEvent(new Event("change"));
+  if (c.name) $("#bName").dispatchEvent(new Event("change"));      // fills phone / place of a saved customer
   if (r.items.length) { $("#itemRows").innerHTML = ""; r.items.forEach(i => addRow({ name: i.name, qty: i.qty, rate: i.rate })); }
-  if (r.paid != null) $("#bPaid").value = r.paid;
+  const total = calc();
+  if (r.paidFull) $("#bPaid").value = total; else if (r.paid != null) $("#bPaid").value = r.paid;
   calc();
+  const noRate = [...$("#itemRows").children].filter(tr => tr.querySelector(".n").value.trim() && !num(tr.querySelector(".r").value));
+  noRate.forEach(tr => tr.querySelector(".r").classList.add("warn"));
   st.className = r.items.length ? "status" : "status err";
-  st.textContent = r.items.length ? `Found ${r.items.length} item${r.items.length === 1 ? "" : "s"}. Check them, then save.` : "Couldn't find items. Say each one like “rice 5 kg at 60”.";
+  st.textContent = !r.items.length ? (opts.live ? "Listening…" : "Couldn't find items. Say each one like “rice 5 kg at 60”.")
+    : `Found ${r.items.length} item${r.items.length === 1 ? "" : "s"}.` + (noRate.length ? ` ${noRate.length} need${noRate.length === 1 ? "s" : ""} a rate (marked red).` : " Check them, then save.");
 }
 
 function nextBillNo(date) {
@@ -610,6 +650,209 @@ $("#billDelete").addEventListener("click", async () => {
   await writeMany(changes);
   $("#billDlg").close(); toast(`Bill ${b.no} cancelled`);
 });
+
+/* ================= dates ================= */
+const pad2 = n => String(n).padStart(2, "0");
+const ymd = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
+const addDays = (d, n) => { const x = new Date(d + "T00:00"); x.setDate(x.getDate() + n); return ymd(x.getFullYear(), x.getMonth() + 1, x.getDate()); };
+const daysBetween = (a, b) => Math.round((new Date(b + "T00:00") - new Date(a + "T00:00")) / 864e5);
+const byName = (a, b) => (a.name || "").localeCompare(b.name || "");
+
+/* ================= staff + attendance ================= */
+let attDay = today();
+let attIdx = {};
+function buildAtt() {
+  attIdx = {};
+  for (const r of Object.values(S.attendance)) {            // two phones may both mark a day: the newest wins
+    const k = r.employee_id + "|" + r.att_date, o = attIdx[k];
+    if (!o || (r.updated_at || "") > (o.updated_at || "")) attIdx[k] = r;
+  }
+}
+const attOf = (emp, d) => { const r = attIdx[emp + "|" + d]; return r && !r.deleted_at ? r.status : null; };
+function attRow(emp, date, status) {
+  const old = attIdx[emp + "|" + date];
+  const cur = old && !old.deleted_at ? old.status : null;
+  if (status === cur) status = null;                          // tapping the same button again clears the day
+  if (!status && !cur) return null;
+  return { ...(old || { id: db.uuid(), employee_id: emp, att_date: date, note: "" }), status: status || cur, deleted_at: status ? null : new Date().toISOString() };
+}
+async function setAtt(emp, date, status) { const row = attRow(emp, date, status); if (row) await write("attendance", row); }
+function monthStats(emp, ym) {
+  let p = 0, h = 0, a = 0;
+  for (const r of Object.values(attIdx)) {
+    if (r.deleted_at || r.employee_id !== emp || !String(r.att_date).startsWith(ym)) continue;
+    if (r.status === "present") p++; else if (r.status === "half") h++; else if (r.status === "absent") a++;
+  }
+  return { p, h, a };
+}
+const pills = (p, h, a, n) => `<span class="pill present">Present ${p}</span><span class="pill half">Half day ${h}</span><span class="pill absent">Absent ${a}</span>` + (n != null ? `<span class="pill">Not marked ${n}</span>` : "");
+
+function renderStaff() {
+  $("#attDate").value = attDay;
+  const wd = new Date(attDay + "T00:00").toLocaleDateString("en-IN", { weekday: "long" });
+  $("#attDay").textContent = attDay === today() ? `Today, ${wd}` : wd;
+  const emps = live("employees").sort(byName);
+  const list = $("#empList");
+  $("#allPresent").disabled = !emps.length;
+  if (!emps.length) { $("#attSum").innerHTML = ""; list.innerHTML = `<div class="empty"><strong>No staff yet</strong>Tap Add staff, then mark who came each day with one tap.</div>`; return; }
+  let p = 0, h = 0, a = 0;
+  emps.forEach(e => { const s = attOf(e.id, attDay); if (s === "present") p++; else if (s === "half") h++; else if (s === "absent") a++; });
+  $("#attSum").innerHTML = pills(p, h, a, emps.length - p - h - a);
+  const ym = attDay.slice(0, 7);
+  list.innerHTML = emps.map(e => {
+    const cur = attOf(e.id, attDay), m = monthStats(e.id, ym);
+    const b = (st, label) => `<button class="att ${st}" data-att="${esc(e.id)}" data-st="${st}" aria-pressed="${cur === st}">${label}</button>`;
+    return `<div class="row emp">
+      <div><div class="name">${esc(e.name)}</div>
+        <div class="meta">${esc(e.role || "")}${e.role ? " · " : ""}This month: ${m.p} present${m.h ? `, ${m.h} half` : ""}${m.a ? `, ${m.a} absent` : ""}</div></div>
+      <button class="btn small ghost" data-emp="${esc(e.id)}">Details</button>
+      <div class="attbtns">${b("present", "Present")}${b("half", "Half day")}${b("absent", "Absent")}</div></div>`;
+  }).join("");
+}
+$("#attDate").addEventListener("change", e => { if (e.target.value) { attDay = e.target.value; renderStaff(); } });
+$("#attPrev").addEventListener("click", () => { attDay = addDays(attDay, -1); renderStaff(); });
+$("#attNext").addEventListener("click", () => { attDay = addDays(attDay, 1); renderStaff(); });
+$("#allPresent").addEventListener("click", async () => {
+  const rows = live("employees").map(e => attOf(e.id, attDay) ? null : attRow(e.id, attDay, "present")).filter(Boolean);
+  if (!rows.length) { toast("Everyone is already marked"); return; }
+  await writeMany(rows.map(row => ({ table: "attendance", row })));
+  toast(`${rows.length} marked present`);
+});
+
+let editingEmp = null, empMonth = today().slice(0, 7);
+function openEmp(e) {
+  editingEmp = e || null;
+  $("#empTitle").textContent = e ? e.name : "Add staff";
+  $("#eName").value = e?.name || ""; $("#ePhone").value = e?.phone || ""; $("#eRole").value = e?.role || "";
+  $("#eWage").value = e?.wage ?? ""; $("#eWageType").value = e?.wage_type || "day"; $("#eNote").value = e?.note || "";
+  $("#empDelete").hidden = !e; $("#empMonthBox").hidden = !e;
+  empMonth = attDay.slice(0, 7);
+  if (e) renderEmpMonth();
+  $("#empDlg").showModal(); if (!e) $("#eName").focus();
+}
+function renderEmpMonth() {
+  const e = editingEmp; if (!e) return;
+  const [y, m] = empMonth.split("-").map(Number);
+  $("#empMonthLbl").textContent = new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const st = monthStats(e.id, empMonth);
+  $("#empMonthSum").innerHTML = pills(st.p, st.h, st.a);
+  const first = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate(), t = today();
+  let html = ["S", "M", "T", "W", "T", "F", "S"].map(d => `<div class="dow">${d}</div>`).join("") + "<div></div>".repeat(first);
+  for (let d = 1; d <= days; d++) {
+    const date = ymd(y, m, d), cur = attOf(e.id, date);
+    html += `<button type="button" class="${cur || ""} ${date === t ? "today" : ""}" data-day="${date}" aria-label="${esc(fmtDate(date))}${cur ? ", " + cur : ""}">${d}</button>`;
+  }
+  $("#empCal").innerHTML = html;
+  const wage = num(e.wage);
+  $("#empPay").textContent = !wage ? "" : e.wage_type === "month"
+    ? `About ${rupee(Math.max(0, wage - wage / 30 * (st.a + st.h / 2)))} for this month (${rupee(wage)} less ${rupee(wage / 30 * (st.a + st.h / 2))} for absent days marked).`
+    : `About ${rupee(wage * (st.p + st.h / 2))} earned this month (${st.p + st.h / 2} days at ${rupee(wage)}).`;
+}
+$("#empPrevM").addEventListener("click", () => { const [y, m] = empMonth.split("-").map(Number); const d = new Date(y, m - 2, 1); empMonth = ymd(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7); renderEmpMonth(); });
+$("#empNextM").addEventListener("click", () => { const [y, m] = empMonth.split("-").map(Number); const d = new Date(y, m, 1); empMonth = ymd(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7); renderEmpMonth(); });
+$("#addEmp").addEventListener("click", () => openEmp(null));
+$("#empSave").addEventListener("click", async () => {
+  const name = $("#eName").value.trim(); if (!name) { $("#eName").focus(); return; }
+  const w = $("#eWage").value.trim();
+  await write("employees", { ...(editingEmp || { id: db.uuid(), deleted_at: null }), name, phone: phone10($("#ePhone").value), role: $("#eRole").value.trim(),
+    wage: w === "" ? null : money(w), wage_type: $("#eWageType").value, note: $("#eNote").value.trim() });
+  $("#empDlg").close(); toast("Staff saved");
+});
+$("#empDelete").addEventListener("click", async () => {
+  if (!editingEmp || !confirm(`Remove ${editingEmp.name}? Their attendance is kept in backups.`)) return;
+  await write("employees", { ...editingEmp, deleted_at: new Date().toISOString() });
+  $("#empDlg").close(); toast("Staff removed");
+});
+$("#empDlg form").addEventListener("submit", e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); $("#empSave").click(); });
+$("#empDlg").addEventListener("close", () => { editingEmp = null; });
+
+/* ================= payment reminders ================= */
+const REPEAT = { none: "One time", weekly: "Every week", monthly: "Every month", yearly: "Every year" };
+function nextDue(d, rep) {
+  const [y, m, day] = d.split("-").map(Number);
+  if (rep === "weekly") return addDays(d, 7);
+  if (rep === "monthly") { const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1; return ymd(ny, nm, Math.min(day, new Date(ny, nm, 0).getDate())); }
+  if (rep === "yearly") return ymd(y + 1, m, Math.min(day, new Date(y + 1, m, 0).getDate()));
+  return d;
+}
+const isOpenRem = r => r.repeat !== "none" || !r.paid_on;
+function whenText(due) {
+  const n = daysBetween(today(), due);
+  return n < 0 ? { t: `${-n} day${n === -1 ? "" : "s"} late`, c: "late" } : n === 0 ? { t: "Due today", c: "today" } : n === 1 ? { t: "Due tomorrow", c: "" } : { t: `Due in ${n} days`, c: "" };
+}
+function renderReminders() {
+  const all = live("reminders"), open = all.filter(isOpenRem).sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const t = today(), days = r => daysBetween(t, r.due_date);
+  const week = open.filter(r => days(r) <= 7);
+  $("#payTotal").textContent = rupee(week.reduce((s, r) => s + num(r.amount), 0));
+  const late = open.filter(r => days(r) < 0).length;
+  $("#payCount").textContent = week.length ? `${week.length} payment${week.length === 1 ? "" : "s"}${late ? `, ${late} late` : ""}` : "Nothing coming up";
+  const soon = open.filter(r => days(r) <= 3).length;
+  $("#payBadge").hidden = !soon; $("#payBadge").textContent = soon;
+  $("#payBanner").hidden = !soon;
+  if (soon) $("#payBannerText").textContent = late ? `${late} payment${late === 1 ? " is" : "s are"} late${soon > late ? `, ${soon - late} more due in 3 days` : ""}.` : `${soon} payment${soon === 1 ? "" : "s"} due in the next 3 days.`;
+
+  const row = (r, done) => {
+    const w = whenText(r.due_date);
+    return `<div class="row rem" style="grid-template-columns:1fr auto">
+      <div><div class="name">${esc(r.title)}</div>
+        <div class="meta">${done ? `Paid on ${esc(fmtDate(r.paid_on))}` : `<span class="when ${w.c}">${w.t}</span>, ${esc(fmtDate(r.due_date))}`}${r.repeat !== "none" ? ` · ${REPEAT[r.repeat]}` : ""}${r.paid_on && r.repeat !== "none" ? `<br>Last paid ${esc(fmtDate(r.paid_on))}` : ""}${r.note ? `<br>${esc(r.note)}` : ""}</div></div>
+      <div class="due ${!done && days(r) > 7 ? "soon" : ""}">${num(r.amount) ? rupee(r.amount) : ""}</div>
+      <div class="rowacts">${done ? `<button class="btn small" data-unpaid="${esc(r.id)}">Undo</button>`
+        : `<button class="btn small primary" data-paid="${esc(r.id)}">Mark paid</button>`}<button class="btn small ghost" data-remedit="${esc(r.id)}">Edit</button></div></div>`;
+  };
+  const group = (title, rows) => rows.length ? `<p class="section-h">${title}</p>` + rows.map(r => row(r, false)).join("") : "";
+  const done = all.filter(r => !isOpenRem(r)).sort((a, b) => b.paid_on.localeCompare(a.paid_on));
+  let html = group("Late", open.filter(r => days(r) < 0)) + group("Next 7 days", open.filter(r => days(r) >= 0 && days(r) <= 7)) + group("Later", open.filter(r => days(r) > 7));
+  if ($("#showPaid").checked && done.length) html += `<p class="section-h">Done</p>` + done.map(r => row(r, true)).join("");
+  $("#remList").innerHTML = html || `<div class="empty"><strong>No payments to remember</strong>Add rent, electricity, supplier or loan payments with their dates.</div>`;
+}
+$("#showPaid").addEventListener("change", renderReminders);
+$("#payBannerGo").addEventListener("click", () => show("payments"));
+
+let editingRem = null;
+function openRem(r) {
+  editingRem = r || null;
+  $("#remTitleH").textContent = r ? "Edit payment" : "Add payment";
+  $("#rTitle").value = r?.title || ""; $("#rAmt").value = r?.amount ?? ""; $("#rDate").value = r?.due_date || today();
+  $("#rRepeat").value = r?.repeat || "none"; $("#rNote").value = r?.note || "";
+  $("#remDelete").hidden = !r; $("#remDlg").showModal(); if (!r) $("#rTitle").focus();
+}
+$("#addRem").addEventListener("click", () => openRem(null));
+$("#remSave").addEventListener("click", async () => {
+  const title = $("#rTitle").value.trim(); if (!title) { $("#rTitle").focus(); return; }
+  if (!$("#rDate").value) { $("#rDate").focus(); return; }
+  const a = $("#rAmt").value.trim();
+  await write("reminders", { ...(editingRem || { id: db.uuid(), paid_on: null, deleted_at: null }), title, amount: a === "" ? null : money(a),
+    due_date: $("#rDate").value, repeat: $("#rRepeat").value, note: $("#rNote").value.trim() });
+  $("#remDlg").close(); toast("Payment saved");
+});
+$("#remDelete").addEventListener("click", async () => {
+  if (!editingRem || !confirm(`Remove ${editingRem.title}?`)) return;
+  await write("reminders", { ...editingRem, deleted_at: new Date().toISOString() });
+  $("#remDlg").close(); toast("Payment removed");
+});
+$("#remDlg form").addEventListener("submit", e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); $("#remSave").click(); });
+
+document.addEventListener("click", async e => {
+  const t = e.target.closest("[data-att],[data-emp],[data-day],[data-paid],[data-unpaid],[data-remedit]");
+  if (!t) return;
+  if (t.dataset.att) await setAtt(t.dataset.att, attDay, t.dataset.st);
+  else if (t.dataset.emp) openEmp(S.employees[t.dataset.emp]);
+  else if (t.dataset.day && editingEmp) {
+    const cur = attOf(editingEmp.id, t.dataset.day);
+    await setAtt(editingEmp.id, t.dataset.day, { null: "present", present: "half", half: "absent", absent: "absent" }[cur]);   // absent again = clear
+  } else if (t.dataset.remedit) openRem(S.reminders[t.dataset.remedit]);
+  else if (t.dataset.unpaid) { const r = S.reminders[t.dataset.unpaid]; if (r) await write("reminders", { ...r, paid_on: null }); }
+  else if (t.dataset.paid) {
+    const r = S.reminders[t.dataset.paid]; if (!r) return;
+    if (r.repeat !== "none") { const nx = nextDue(r.due_date, r.repeat); await write("reminders", { ...r, due_date: nx, paid_on: today() }); toast(`Marked paid. Next due ${fmtDate(nx)}`); }
+    else { await write("reminders", { ...r, paid_on: today() }); toast("Marked paid"); }
+  }
+});
+// a new day starts while the app is open: refresh "today" things
+let lastDay = today();
+setInterval(() => { if (today() !== lastDay) { if (attDay === lastDay) attDay = today(); lastDay = today(); render(); } }, 60000);
 
 /* ================= settings + backup ================= */
 $("#openSettings").addEventListener("click", async () => {
