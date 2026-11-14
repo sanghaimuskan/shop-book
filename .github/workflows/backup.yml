@@ -1,0 +1,51 @@
+# Nightly encrypted backup of the Supabase database, kept for 90 days.
+# This is independent of Supabase's own backups and of the app.
+#
+# Setup (GitHub repo → Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     Supabase → Connect → "Session pooler" connection string,
+#                       with your database password filled in.
+#   BACKUP_PASSPHRASE   Any long passphrase. Store it somewhere safe (not only
+#                       in GitHub) — you need it to open the backups.
+#
+# Restore:  gpg -d shop-book-YYYY-MM-DD.tar.gz.gpg | tar xz
+#           then run schema.sql followed by data.sql in a fresh Supabase project.
+
+name: Nightly database backup
+on:
+  schedule:
+    - cron: "30 20 * * *"   # 02:00 IST
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump schema and data
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir dump
+          supabase db dump --db-url "$DB_URL" -f dump/schema.sql
+          supabase db dump --db-url "$DB_URL" -f dump/data.sql --data-only --use-copy
+          ls -la dump
+          test -s dump/data.sql
+
+      - name: Encrypt
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          NAME="shop-book-$(date -u +%F)"
+          tar czf "$NAME.tar.gz" -C dump .
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 -o "$NAME.tar.gz.gpg" "$NAME.tar.gz"
+          rm -rf dump "$NAME.tar.gz"
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz.gpg
+          retention-days: 90

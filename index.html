@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shop Book</title>
+<meta name="theme-color" content="#1F3A93">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Shop Book">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;600;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ SIGN IN ============ -->
+<div class="login" id="login" hidden>
+  <div class="card">
+    <h1>Shop Book</h1>
+    <p id="loginIntro">Sign in to keep your shop records safe in the cloud.</p>
+    <div id="stepEmail">
+      <label>Email<input id="loginEmail" type="email" autocomplete="username" inputmode="email"></label>
+      <label style="margin-top:10px">Password<input id="loginPass" type="password" autocomplete="current-password" minlength="8"></label>
+      <button class="btn primary" id="signIn">Sign in</button>
+      <button class="btn ghost" id="signUp">First time? Create the shop account</button>
+    </div>
+    <div id="stepCode" hidden></div>
+    <p class="status" id="loginStatus" role="status"></p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="app" id="app" hidden>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-v="dues" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4z"/><path d="M8 11h8M8 15h5"/></svg>Dues</button>
+    <button class="tab" role="tab" data-v="stock" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Stock</button>
+    <button class="tab" role="tab" data-v="newbill" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>New bill</button>
+    <button class="tab" role="tab" data-v="bills" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Bills</button>
+  </nav>
+
+  <main>
+    <div class="top">
+      <div>
+        <p class="shopname" id="shopTitle">My Shop</p>
+        <button class="shopsub sync" id="sync" style="border:0;background:none;padding:0;cursor:pointer;text-align:left"><span class="dot off"></span>Starting…</button>
+      </div>
+      <button class="iconbtn" id="openSettings" aria-label="Shop details and backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l2-6h14l2 6"/><path d="M4 10v10h16V10"/><path d="M9 20v-6h6v6"/></svg>
+      </button>
+    </div>
+
+    <div class="banner" id="updateBanner" hidden>
+      <span>A new version of the app is ready.</span>
+      <button class="btn small blue" id="reloadApp">Update now</button>
+    </div>
+    <div class="banner warn" id="backupBanner" hidden>
+      <span id="backupBannerText">You haven't downloaded a backup this week.</span>
+      <button class="btn small" id="backupNow">Download backup</button>
+    </div>
+
+    <!-- DUES -->
+    <section class="view on" id="v-dues">
+      <div class="ledger">
+        <div>
+          <div class="lbl">Total money to collect</div>
+          <div class="amt" id="dueTotal">₹0</div>
+          <div class="lbl" id="dueCount">No dues yet</div>
+        </div>
+        <div class="actions">
+          <label class="btn primary" style="flex-direction:row;color:var(--marigold-ink)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Photo of bill
+            <input type="file" accept="image/*" capture="environment" id="duePhoto" hidden>
+          </label>
+          <button class="btn" id="addDue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add by hand</button>
+        </div>
+      </div>
+      <input class="search" id="dueSearch" type="search" placeholder="Search name, phone or place">
+      <label class="toggle"><input type="checkbox" id="showSettled"> Show customers with nothing due</label>
+      <div class="list" id="dueList"></div>
+    </section>
+
+    <!-- STOCK -->
+    <section class="view" id="v-stock">
+      <div class="actions" style="margin-bottom:12px">
+        <button class="btn primary" id="addProd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add product</button>
+      </div>
+      <input class="search" id="prodSearch" type="search" placeholder="Search products">
+      <div class="list" id="prodList"></div>
+    </section>
+
+    <!-- NEW BILL -->
+    <section class="view" id="v-newbill">
+      <div class="card">
+        <div class="voice">
+          <button class="mic" id="mic" aria-label="Speak the bill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+          </button>
+          <div class="say">
+            <b id="micLabel">Tap and speak the bill</b>
+            <span class="hint">Say the name, phone, “from” place, then each item with quantity and price. Say “done” at the end.</span>
+          </div>
+          <select id="lang" aria-label="Speaking language" style="width:auto">
+            <option value="en-IN">English</option>
+            <option value="hi-IN">हिन्दी</option>
+            <option value="ta-IN">தமிழ்</option>
+          </select>
+        </div>
+        <label>What was said (you can also type here)
+          <textarea id="spoken" placeholder="Ramesh 98400 12345 from Tambaram. Rice 5 kg at 60, sugar 2 kg at 45, oil 1 litre for 160. Paid 200. Done."></textarea>
+        </label>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn blue" id="fillBill">Fill the bill from this</button>
+        </div>
+        <p class="status" id="billStatus" role="status"></p>
+      </div>
+
+      <div class="card">
+        <div class="grid three">
+          <label>Customer name<input id="bName" list="custNames" autocomplete="off"></label>
+          <label>Phone<input id="bPhone" inputmode="tel" autocomplete="off"></label>
+          <label>Place<input id="bPlace" autocomplete="off"></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tablewrap">
+          <table class="items">
+            <thead><tr><th>Item</th><th>Qty</th><th>Rate ₹</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+            <tbody id="itemRows"></tbody>
+          </table>
+        </div>
+        <button class="btn small ghost" id="addRow" style="margin-top:8px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add item</button>
+        <div class="totalbar">
+          <div><div class="hint" style="margin:0">Total</div><div class="t" id="bTotal">₹0</div></div>
+          <label style="max-width:170px">Paid now ₹<input id="bPaid" inputmode="decimal" placeholder="0"></label>
+        </div>
+        <p class="hint" id="balHint">Anything not paid goes into Dues for this customer.</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="saveBill">Save bill</button>
+        <button class="btn" id="savePrint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg>Save and print</button>
+        <button class="btn ghost" id="clearBill">Clear</button>
+      </div>
+    </section>
+
+    <!-- BILLS -->
+    <section class="view" id="v-bills">
+      <input class="search" id="billSearch" type="search" placeholder="Search bills by name, phone or number">
+      <div class="list" id="billList"></div>
+    </section>
+  </main>
+</div>
+
+<datalist id="prodNames"></datalist>
+<datalist id="custNames"></datalist>
+
+<!-- due dialog -->
+<dialog id="dueDlg">
+  <form class="dlg" method="dialog">
+    <header><h2>Add due</h2><button class="iconbtn" value="cancel" aria-label="Close">✕</button></header>
+    <img class="photo" id="duePreview" alt="Bill photo" hidden>
+    <div class="grid two">
+      <label>Customer name<input id="dName" list="custNames" required></label>
+      <label>Phone<input id="dPhone" inputmode="tel"></label>
+      <label>Place<input id="dPlace"></label>
+      <label>Amount due ₹<input id="dAmt" inputmode="decimal" required></label>
+      <label>Bill date<input id="dDate" type="date"></label>
+      <label>Note<input id="dNote" placeholder="What the bill is for"></label>
+    </div>
+    <footer><button class="btn primary" type="button" id="dueSave">Save due</button></footer>
+  </form>
+</dialog>
+
+<!-- customer dialog: history + payment -->
+<dialog id="custDlg">
+  <div class="dlg">
+    <header><h2 id="custTitle">Customer</h2><button class="iconbtn" id="custClose" aria-label="Close">✕</button></header>
+    <div id="custHead"></div>
+    <div class="card" style="margin:0">
+      <label>Got payment ₹<input id="payAmt" inputmode="decimal"></label>
+      <div class="actions" style="margin-top:10px"><button class="btn primary" id="paySave">Save payment</button></div>
+    </div>
+    <p class="section-h">History</p>
+    <div class="hist" id="custHist"></div>
+    <details>
+      <summary class="hint" style="cursor:pointer">Edit customer details</summary>
+      <div class="grid two" style="margin-top:10px">
+        <label>Name<input id="cName"></label>
+        <label>Phone<input id="cPhone" inputmode="tel"></label>
+        <label>Place<input id="cPlace"></label>
+        <label>Note<input id="cNote"></label>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn" id="custSave">Save details</button>
+        <button class="btn danger ghost" id="custDelete">Remove customer</button>
+      </div>
+    </details>
+  </div>
+</dialog>
+
+<!-- product dialog -->
+<dialog id="prodDlg">
+  <form class="dlg" method="dialog">
+    <header><h2 id="prodDlgTitle">Add product</h2><button class="iconbtn" value="cancel" aria-label="Close">✕</button></header>
+    <label>Product name<input id="pName" required></label>
+    <div class="grid three">
+      <label>We bought at ₹<input id="pCost" inputmode="decimal"></label>
+      <label>Wholesale ₹<input id="pWhole" inputmode="decimal"></label>
+      <label>Retail ₹<input id="pRetail" inputmode="decimal"></label>
+    </div>
+    <div class="grid two">
+      <label>Unit<input id="pUnit" placeholder="kg, piece, box"></label>
+      <label>In stock<input id="pQty" inputmode="decimal"></label>
+    </div>
+    <footer>
+      <button class="btn danger ghost" type="button" id="prodDelete" hidden>Remove</button>
+      <button class="btn primary" type="button" id="prodSave">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- bill view dialog -->
+<dialog id="billDlg">
+  <div class="dlg">
+    <header><h2>Bill</h2><button class="iconbtn" id="billClose" aria-label="Close">✕</button></header>
+    <div id="billView"></div>
+    <footer>
+      <button class="btn danger ghost" id="billDelete">Cancel bill</button>
+      <a class="btn" id="billWa" target="_blank" rel="noopener">Send on WhatsApp</a>
+      <button class="btn primary" id="billPrint">Print</button>
+    </footer>
+  </div>
+</dialog>
+
+<!-- settings + backup -->
+<dialog id="setDlg">
+  <div class="dlg">
+    <header><h2>Shop and backup</h2><button class="iconbtn" id="setClose" aria-label="Close">✕</button></header>
+    <p class="section-h">Shop details for bills</p>
+    <label>Shop name<input id="sName"></label>
+    <label>Address<input id="sAddr"></label>
+    <div class="grid two">
+      <label>Phone<input id="sPhone" inputmode="tel"></label>
+      <label>GSTIN (optional)<input id="sGst"></label>
+    </div>
+    <label>Printer paper
+      <select id="sPaper"><option value="a5">Normal printer (A4 / A5)</option><option value="58mm">58 mm thermal printer</option></select>
+    </label>
+    <div class="actions"><button class="btn primary" id="setSave">Save shop details</button></div>
+
+    <p class="section-h">Backup</p>
+    <p class="hint" id="backupInfo" style="margin:0"></p>
+    <div class="actions">
+      <button class="btn" id="exportJson">Download full backup</button>
+      <button class="btn" id="exportCsv">Download dues list (Excel)</button>
+      <label class="btn ghost" style="flex-direction:row">Restore from backup<input type="file" accept="application/json,.json" id="importJson" hidden></label>
+    </div>
+    <p class="status" id="backupStatus" role="status"></p>
+
+    <p class="section-h">Account</p>
+    <p class="hint" id="acctInfo" style="margin:0"></p>
+    <div class="actions"><button class="btn ghost" id="syncNow">Sync now</button><button class="btn danger ghost" id="signOut">Sign out</button></div>
+  </div>
+</dialog>
+
+<div id="printArea"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="vendor/supabase.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
