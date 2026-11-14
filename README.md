@@ -1,6 +1,6 @@
 # Arun Cloth Store
 
-An installable web app (PWA) for running a small shop. It covers customer dues with bill photos, call and WhatsApp reminders, stock with buying, wholesale and retail prices, bills, and printing. It works on Android, iPhone, and desktop from one codebase. It also works fully offline and backs up to the cloud when the internet comes back.
+An installable web app (PWA) for running a small shop. It covers customer dues, call and WhatsApp reminders, stock with buying, wholesale and retail prices, bills, and printing. It works on Android, iPhone, and desktop from one codebase. It also works fully offline and backs up to the cloud when the internet comes back.
 
 No build step: these are plain static files.
 
@@ -53,18 +53,16 @@ Push the folder to a **private** GitHub repo and add two secrets (Settings → S
 
 Run it once by hand (Actions → *Nightly database backup* → Run workflow) to confirm it works. To open a backup: `gpg -d shop-book-DATE.tar.gz.gpg | tar xz`.
 
-Bill **photos** live in Supabase Storage and are not part of the SQL dump. They're also kept on the phone that took them.
 
 ## Using it
 
-- **Dues:** take a photo of a bill or add one by hand, and the customer is created automatically. *Got payment / history* records a payment and shows every entry with its photos.
+- **Dues:** add a due and the customer is created automatically. *Got payment / history* records a payment and shows every entry.
 - **Stock:** enter buying, wholesale and retail prices to see profit per unit and margin. Stock goes down automatically when a bill is saved, and comes back if the bill is cancelled.
 - **New bill:** enter the customer, add each item with quantity and rate, and tap Save bill. Picking a product from Stock fills in its retail price. Any amount left unpaid goes to that customer's dues.
 - **Printing:** in Settings, choose a normal printer (A5) or a 58 mm thermal printer. On Android, most Bluetooth thermal printers work through their maker's print-service app or a "RawBT"-style driver, which then shows up in the normal print dialog.
 
 ## Known limits
 
-- **Bill photos aren't read automatically yet.** The photo is stored with the due entry, and the amount is typed in. Automatic reading can be added later with a Supabase Edge Function calling an OCR or vision API.
 - **Stock quantities** use last-write-wins. If two phones sell the same item while both are offline, one decrement can be lost. Money is not affected, because dues use the ledger.
 - **Bill numbers** (`YYMMDD-n`) are per device. Two phones billing offline on the same day can repeat a number. Records stay separate because each has its own ID.
 
@@ -75,7 +73,7 @@ index.html             app shell
 app.css                styles (light + dark)
 js/app.js              screens and business logic
 js/db.js               on-device database + upload queue
-js/sync.js             Supabase sync (push, pull, photos)
+js/sync.js             Supabase sync (push, pull)
 js/config.js           your Supabase URL + key
 sw.js                  offline support and updates
 manifest.webmanifest   install info and icons

@@ -10,14 +10,13 @@ export const sb = configured
     })
   : null;
 
-const BUCKET = "bill-photos";
 const COLUMNS = {
   shops: ["id", "name", "address", "phone", "gstin", "paper", "updated_at", "deleted_at"],
   customers: ["id", "name", "phone", "place", "note", "updated_at", "deleted_at"],
   products: ["id", "name", "cost", "wholesale", "retail", "unit", "qty", "category", "updated_at", "deleted_at"],
   bills: ["id", "no", "customer_id", "customer_name", "phone", "place", "items", "total", "paid", "bill_date", "updated_at", "deleted_at"],
-  employees: ["id", "name", "phone", "role", "wage", "wage_type", "note", "updated_at", "deleted_at"],
-  attendance: ["id", "employee_id", "att_date", "status", "note", "updated_at", "deleted_at"],
+  employees: ["id", "name", "phone", "wage", "wage_type", "note", "updated_at", "deleted_at"],
+  attendance: ["id", "employee_id", "att_date", "status", "check_in", "check_out", "note", "updated_at", "deleted_at"],
   reminders: ["id", "title", "amount", "due_date", "repeat", "note", "paid_on", "updated_at", "deleted_at"],
   entries: ["id", "customer_id", "kind", "amount", "bill_id", "note", "photo_path", "entry_date", "updated_at", "deleted_at"],
 };
@@ -69,27 +68,6 @@ async function pull() {
   return changed;
 }
 
-async function uploadPhotos() {
-  const pending = await db.photosPending();
-  for (const p of pending) {
-    const { error } = await sb.storage.from(BUCKET).upload(p.path, p.blob, { upsert: true, contentType: "image/jpeg" });
-    if (error && !/exists/i.test(error.message || "")) throw error;
-    await db.photoPut(p.path, p.blob, true);
-  }
-}
-
-// Fetch a photo for display: local copy first, cloud if needed.
-export async function photoUrl(path) {
-  if (!path) return null;
-  const local = await db.photoGet(path);
-  if (local) return URL.createObjectURL(local.blob);
-  if (!sb || !navigator.onLine) return null;
-  const { data, error } = await sb.storage.from(BUCKET).download(path);
-  if (error || !data) return null;
-  await db.photoPut(path, data, true);
-  return URL.createObjectURL(data);
-}
-
 // Run one sync. Calls made while a sync is running queue exactly one more.
 export function sync() {
   if (!sb) return Promise.resolve(0);
@@ -103,7 +81,6 @@ export function sync() {
       if (!data.session) return 0;
       state.busy = true; state.error = null; emit();
       await push();
-      await uploadPhotos();
       changed = await pull();
       state.lastSync = Date.now();
       await db.metaSet("lastSync", state.lastSync);

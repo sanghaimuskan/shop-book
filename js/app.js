@@ -1,5 +1,5 @@
 import * as db from "./db.js";
-import { sb, configured, sync, syncSoon, startAutoSync, onStatus, state as syncState, photoUrl, refreshPending } from "./sync.js";
+import { sb, configured, sync, syncSoon, startAutoSync, onStatus, state as syncState, refreshPending } from "./sync.js";
 
 /* ================= helpers ================= */
 const $ = s => document.querySelector(s);
@@ -194,7 +194,7 @@ function renderDues() {
   const shown = custs.filter(c => (showAll || c.bal > 0) && (!q || [c.name, c.phone, c.place].join(" ").toLowerCase().includes(q)))
     .sort((a, b) => b.bal - a.bal || (a.name || "").localeCompare(b.name || ""));
   const list = $("#dueList");
-  if (!custs.length) { list.innerHTML = `<div class="empty"><strong>No dues yet</strong>Take a photo of a bill, add one by hand, or save an unpaid bill.</div>`; return; }
+  if (!custs.length) { list.innerHTML = `<div class="empty"><strong>No dues yet</strong>Add one with Add due, or save an unpaid bill.</div>`; return; }
   if (!shown.length) { list.innerHTML = `<div class="empty"><strong>${q ? "No match" : "Nobody owes money"}</strong>${q ? "Try a different name or number." : "Tick the box above to see all customers."}</div>`; return; }
   const s = shop();
   list.innerHTML = shown.map(c => {
@@ -316,15 +316,10 @@ function renderCustomer() {
   $("#custHist").innerHTML = ents.length ? ents.map(e => `<div class="h">
       <div><b>${esc(label[e.kind] || e.kind)}</b> <span class="hint">${esc(fmtDate(e.entry_date))}</span>${e.note ? `<div class="hint" style="margin:0">${esc(e.note)}</div>` : ""}</div>
       <div class="a ${num(e.amount) < 0 ? "minus" : ""}">${num(e.amount) < 0 ? "−" : "+"}${rupee(Math.abs(num(e.amount)))}</div>
-      ${e.photo_path ? `<img data-photo="${esc(e.photo_path)}" alt="Bill photo">` : ""}
       <div class="actions" style="grid-column:1/-1">
         ${e.bill_id && S.bills[e.bill_id] ? `<button class="btn small ghost" data-viewbill="${esc(e.bill_id)}">View bill</button>` : ""}
         ${!e.bill_id ? `<button class="btn small ghost danger" data-rmentry="${esc(e.id)}">Remove</button>` : ""}
       </div></div>`).join("") : `<p class="hint">No entries yet.</p>`;
-  $$("#custHist img[data-photo]").forEach(async img => {
-    const url = await photoUrl(img.dataset.photo);
-    if (url) img.src = url; else img.replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "Photo will appear when online." }));
-  });
 }
 $("#custClose").addEventListener("click", () => { $("#custDlg").close(); openCustId = null; });
 $("#paySave").addEventListener("click", async () => {
@@ -354,37 +349,16 @@ $("#custDelete").addEventListener("click", async () => {
   $("#custDlg").close(); openCustId = null; toast("Customer removed");
 });
 
-/* ================= add due (photo / manual) ================= */
-let dueBlob = null;
-function openDue(blob, previewUrl) {
-  dueBlob = blob || null;
+/* ================= add due ================= */
+function openDue() {
   ["#dName", "#dPhone", "#dPlace", "#dAmt", "#dNote"].forEach(s => $(s).value = "");
   $("#dDate").value = today();
-  $("#duePreview").hidden = !previewUrl; if (previewUrl) $("#duePreview").src = previewUrl;
   $("#dueDlg").showModal(); $("#dName").focus();
 }
-$("#addDue").addEventListener("click", () => openDue(null));
+$("#addDue").addEventListener("click", () => openDue());
 $("#dName").addEventListener("change", () => {
   const c = live("customers").find(c => c.name.toLowerCase() === $("#dName").value.trim().toLowerCase());
   if (c) { if (!$("#dPhone").value) $("#dPhone").value = c.phone || ""; if (!$("#dPlace").value) $("#dPlace").value = c.place || ""; }
-});
-function shrink(file, max = 1400, q = 0.72) {
-  return new Promise((res, rej) => {
-    const img = new Image(), url = URL.createObjectURL(file);
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      c.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/jpeg", q);
-    };
-    img.onerror = rej; img.src = url;
-  });
-}
-$("#duePhoto").addEventListener("change", async e => {
-  const f = e.target.files[0]; e.target.value = "";
-  if (!f) return;
-  try { const b = await shrink(f); openDue(b, URL.createObjectURL(b)); }
-  catch { toast("Couldn't open that photo"); }
 });
 $("#dueSave").addEventListener("click", async () => {
   const name = $("#dName").value.trim(), amt = num($("#dAmt").value);
@@ -392,13 +366,11 @@ $("#dueSave").addEventListener("click", async () => {
   if (amt <= 0) { $("#dAmt").focus(); return; }
   const { row: cust, changed } = resolveCustomer(name, $("#dPhone").value, $("#dPlace").value);
   const entryId = db.uuid();
-  let photo_path = null;
-  if (dueBlob) { photo_path = `${UID}/${entryId}.jpg`; await db.photoPut(photo_path, dueBlob, LOCAL_ONLY); }
   const changes = [];
   if (changed) changes.push({ table: "customers", row: cust });
-  changes.push({ table: "entries", row: { id: entryId, customer_id: cust.id, kind: "due", amount: money(amt), bill_id: null, note: $("#dNote").value.trim(), photo_path, entry_date: $("#dDate").value || today(), deleted_at: null } });
+  changes.push({ table: "entries", row: { id: entryId, customer_id: cust.id, kind: "due", amount: money(amt), bill_id: null, note: $("#dNote").value.trim(), photo_path: null, entry_date: $("#dDate").value || today(), deleted_at: null } });
   await writeMany(changes);
-  $("#dueDlg").close(); dueBlob = null; toast(`${rupee(amt)} added for ${cust.name}`);
+  $("#dueDlg").close(); toast(`${rupee(amt)} added for ${cust.name}`);
 });
 
 // Enter inside a field saves (instead of silently closing the dialog)
@@ -601,9 +573,27 @@ function attRow(emp, date, status) {
   const cur = old && !old.deleted_at ? old.status : null;
   if (status === cur) status = null;                          // tapping the same button again clears the day
   if (!status && !cur) return null;
-  return { ...(old || { id: db.uuid(), employee_id: emp, att_date: date, note: "" }), status: status || cur, deleted_at: status ? null : new Date().toISOString() };
+  const keep = status === "present" || status === "half";
+  return { ...(old || { id: db.uuid(), employee_id: emp, att_date: date, note: "" }), status: status || cur, deleted_at: status ? null : new Date().toISOString(),
+    check_in: keep && old ? old.check_in || null : null, check_out: keep && old ? old.check_out || null : null };
+}
+const nowHM = () => { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
+const toMin = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
+const worked = (a, b) => { const x = toMin(a), y = toMin(b); return x != null && y != null && y > x ? y - x : 0; };
+const hm = mins => `${Math.floor(mins / 60)}h ${pad2(mins % 60)}m`;
+const attFull = (emp, d) => { const r = attIdx[emp + "|" + d]; return r && !r.deleted_at ? r : null; };
+// record check-in / check-out; this also marks the person present if they weren't marked yet
+async function setTime(emp, date, field, value) {
+  const old = attFull(emp, date);
+  await write("attendance", { ...(old || { id: db.uuid(), employee_id: emp, att_date: date, note: "", status: "present", check_in: null, check_out: null }),
+    deleted_at: null, status: old?.status === "half" ? "half" : old?.status === "absent" ? "present" : old?.status || "present", [field]: value || null });
 }
 async function setAtt(emp, date, status) { const row = attRow(emp, date, status); if (row) await write("attendance", row); }
+function monthHours(emp, ym) {
+  let m = 0;
+  for (const r of Object.values(attIdx)) if (!r.deleted_at && r.employee_id === emp && String(r.att_date).startsWith(ym)) m += worked(r.check_in, r.check_out);
+  return m;
+}
 function monthStats(emp, ym) {
   let p = 0, h = 0, a = 0;
   for (const r of Object.values(attIdx)) {
@@ -627,15 +617,24 @@ function renderStaff() {
   $("#attSum").innerHTML = pills(p, h, a, emps.length - p - h - a);
   const ym = attDay.slice(0, 7);
   list.innerHTML = emps.map(e => {
-    const cur = attOf(e.id, attDay), m = monthStats(e.id, ym);
+    const cur = attOf(e.id, attDay), m = monthStats(e.id, ym), rec = attFull(e.id, attDay);
+    const tin = rec?.check_in || "", tout = rec?.check_out || "", wk = worked(tin, tout);
+    const tcell = (f, label, val) => val
+      ? `<label class="tm"><span>${label}</span><input type="time" value="${esc(val)}" data-time="${esc(e.id)}" data-f="${f}"></label>`
+      : `<button class="btn tmbtn" data-now="${esc(e.id)}" data-f="${f}">${label}</button>`;
     const b = (st, label) => `<button class="att ${st}" data-att="${esc(e.id)}" data-st="${st}" aria-pressed="${cur === st}">${label}</button>`;
     return `<div class="row emp">
       <div><div class="name">${esc(e.name)}</div>
-        <div class="meta">${esc(e.role || "")}${e.role ? " · " : ""}This month: ${m.p} present${m.h ? `, ${m.h} half` : ""}${m.a ? `, ${m.a} absent` : ""}</div></div>
+        <div class="meta">This month: ${m.p} present${m.h ? `, ${m.h} half` : ""}${m.a ? `, ${m.a} absent` : ""}</div></div>
       <button class="btn small ghost" data-emp="${esc(e.id)}">Details</button>
-      <div class="attbtns">${b("present", "Present")}${b("half", "Half day")}${b("absent", "Absent")}</div></div>`;
+      <div class="attbtns">${b("present", "Present")}${b("half", "Half day")}${b("absent", "Absent")}</div>
+      ${cur === "absent" ? "" : `<div class="times">${tcell("check_in", "Check in", tin)}${tcell("check_out", "Check out", tout)}${wk ? `<span class="wk">${hm(wk)}</span>` : ""}</div>`}</div>`;
   }).join("");
 }
+$("#empList").addEventListener("change", e => {
+  const t = e.target.closest("[data-time]");
+  if (t) setTime(t.dataset.time, attDay, t.dataset.f, t.value);
+});
 $("#attDate").addEventListener("change", e => { if (e.target.value) { attDay = e.target.value; renderStaff(); } });
 $("#attPrev").addEventListener("click", () => { attDay = addDays(attDay, -1); renderStaff(); });
 $("#attNext").addEventListener("click", () => { attDay = addDays(attDay, 1); renderStaff(); });
@@ -650,7 +649,7 @@ let editingEmp = null, empMonth = today().slice(0, 7);
 function openEmp(e) {
   editingEmp = e || null;
   $("#empTitle").textContent = e ? e.name : "Add staff";
-  $("#eName").value = e?.name || ""; $("#ePhone").value = e?.phone || ""; $("#eRole").value = e?.role || "";
+  $("#eName").value = e?.name || ""; $("#ePhone").value = e?.phone || "";
   $("#eWage").value = e?.wage ?? ""; $("#eWageType").value = e?.wage_type || "day"; $("#eNote").value = e?.note || "";
   $("#empDelete").hidden = !e; $("#empMonthBox").hidden = !e;
   empMonth = attDay.slice(0, 7);
@@ -662,7 +661,8 @@ function renderEmpMonth() {
   const [y, m] = empMonth.split("-").map(Number);
   $("#empMonthLbl").textContent = new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
   const st = monthStats(e.id, empMonth);
-  $("#empMonthSum").innerHTML = pills(st.p, st.h, st.a);
+  const mh = monthHours(e.id, empMonth);
+  $("#empMonthSum").innerHTML = pills(st.p, st.h, st.a) + (mh ? `<span class="pill">Hours ${hm(mh)}</span>` : "");
   const first = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate(), t = today();
   let html = ["S", "M", "T", "W", "T", "F", "S"].map(d => `<div class="dow">${d}</div>`).join("") + "<div></div>".repeat(first);
   for (let d = 1; d <= days; d++) {
@@ -681,7 +681,7 @@ $("#addEmp").addEventListener("click", () => openEmp(null));
 $("#empSave").addEventListener("click", async () => {
   const name = $("#eName").value.trim(); if (!name) { $("#eName").focus(); return; }
   const w = $("#eWage").value.trim();
-  await write("employees", { ...(editingEmp || { id: db.uuid(), deleted_at: null }), name, phone: phone10($("#ePhone").value), role: $("#eRole").value.trim(),
+  await write("employees", { ...(editingEmp || { id: db.uuid(), deleted_at: null }), name, phone: phone10($("#ePhone").value),
     wage: w === "" ? null : money(w), wage_type: $("#eWageType").value, note: $("#eNote").value.trim() });
   $("#empDlg").close(); toast("Staff saved");
 });
@@ -762,9 +762,10 @@ $("#remDelete").addEventListener("click", async () => {
 $("#remDlg form").addEventListener("submit", e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); $("#remSave").click(); });
 
 document.addEventListener("click", async e => {
-  const t = e.target.closest("[data-att],[data-emp],[data-day],[data-paid],[data-unpaid],[data-remedit]");
+  const t = e.target.closest("[data-att],[data-now],[data-emp],[data-day],[data-paid],[data-unpaid],[data-remedit]");
   if (!t) return;
   if (t.dataset.att) await setAtt(t.dataset.att, attDay, t.dataset.st);
+  else if (t.dataset.now) await setTime(t.dataset.now, attDay, t.dataset.f, nowHM());
   else if (t.dataset.emp) openEmp(S.employees[t.dataset.emp]);
   else if (t.dataset.day && editingEmp) {
     const cur = attOf(editingEmp.id, t.dataset.day);

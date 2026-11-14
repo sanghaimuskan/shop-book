@@ -112,17 +112,6 @@ export function metaSet(key, value) {
   return run(["meta"], "readwrite", t => { t.objectStore("meta").put(value, key); });
 }
 
-export function photoPut(path, blob, uploaded) {
-  return run(["photos"], "readwrite", t => { t.objectStore("photos").put({ path, blob, uploaded: !!uploaded }); });
-}
-export function photoGet(path) {
-  return run(["photos"], "readonly", t => req(t.objectStore("photos").get(path)));
-}
-export function photosPending() {
-  return run(["photos"], "readonly", t => req(t.objectStore("photos").getAll()))
-    .then(all => all.filter(p => !p.uploaded));
-}
-
 // Ask the browser not to clear this app's data when the phone is low on space.
 export async function askPersistent() {
   try {

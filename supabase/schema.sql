@@ -110,7 +110,6 @@ create table if not exists public.employees (
   owner_id    uuid not null default auth.uid() references auth.users on delete cascade,
   name        text not null,
   phone       text,
-  role        text,
   wage        numeric(12,2),                   -- optional
   wage_type   text default 'day',              -- 'day' or 'month'
   note        text,
@@ -125,11 +124,16 @@ create table if not exists public.attendance (
   employee_id  uuid not null,
   att_date     date not null,
   status       text not null check (status in ('present','half','absent')),
+  check_in     text,                           -- 'HH:MM'
+  check_out    text,
   note         text,
   updated_at   timestamptz not null,
   deleted_at   timestamptz,
   synced_at    timestamptz not null default now()
 );
+
+alter table public.attendance add column if not exists check_in text;
+alter table public.attendance add column if not exists check_out text;
 
 create table if not exists public.reminders (
   id          uuid primary key,

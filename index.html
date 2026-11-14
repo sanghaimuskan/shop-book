@@ -85,13 +85,8 @@
           <div class="lbl" id="dueCount">No dues yet</div>
         </div>
         <div class="actions">
-          <label class="btn primary" style="flex-direction:row;color:var(--marigold-ink)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-            Photo of bill
-            <input type="file" accept="image/*" capture="environment" id="duePhoto" hidden>
-          </label>
-          <button class="btn" id="addDue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add by hand</button>
+          <button class="btn primary" id="addDue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add due</button>
         </div>
       </div>
       <input class="search" id="dueSearch" type="search" placeholder="Search name, phone or place">
@@ -194,7 +189,6 @@
 <dialog id="dueDlg">
   <form class="dlg" method="dialog" novalidate>
     <header><h2>Add due</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
-    <img class="photo" id="duePreview" alt="Bill photo" hidden>
     <div class="grid two">
       <label><span>Customer name <span class="req" aria-hidden="true">*</span></span><input id="dName" list="custNames" required></label>
       <label>Phone<input id="dPhone" inputmode="tel"></label>
@@ -305,9 +299,8 @@
   <form class="dlg" method="dialog" novalidate>
     <header><h2 id="empTitle">Add staff</h2><button class="iconbtn" type="submit" value="cancel" formnovalidate aria-label="Close">✕</button></header>
     <label><span>Name <span class="req" aria-hidden="true">*</span></span><input id="eName" required autocomplete="off"></label>
+    <label>Phone<input id="ePhone" inputmode="tel"></label>
     <div class="grid two">
-      <label>Phone<input id="ePhone" inputmode="tel"></label>
-      <label>Work / role<input id="eRole" placeholder="e.g. Helper, Cashier"></label>
       <label>Pay ₹ (optional)<input id="eWage" inputmode="decimal" placeholder="Leave empty if not needed"></label>
       <label>Pay is<select id="eWageType"><option value="day">per day</option><option value="month">per month</option></select></label>
     </div>
